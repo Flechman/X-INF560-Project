@@ -100,7 +100,7 @@ animated_gif* load_pixels( char * filename )
                 g->SavedImages[i].ImageDesc.Height,
                 g->SavedImages[i].ImageDesc.Interlace,
                 g->SavedImages[i].ImageDesc.ColorMap
-                ) ;
+              ) ;
 #endif
     }
 
@@ -118,7 +118,7 @@ animated_gif* load_pixels( char * filename )
             g->SColorMap->ColorCount,
             g->SColorMap->BitsPerPixel,
             g->SColorMap->SortFlag
-            ) ;
+          ) ;
 #endif
 
     /* Allocate the array of pixels to be returned */
@@ -135,12 +135,12 @@ animated_gif* load_pixels( char * filename )
         p[i] = (pixel *)malloc( width[i] * height[i] * sizeof( pixel ) ) ;
         if ( p[i] == NULL )
         {
-        fprintf( stderr, "Unable to allocate %d-th array of %d pixels\n",
-                i, width[i] * height[i] ) ;
-        return NULL ;
+            fprintf( stderr, "Unable to allocate %d-th array of %d pixels\n",
+                    i, width[i] * height[i] ) ;
+            return NULL ;
         }
     }
-    
+
     /* Fill pixels */
 
     /* For each image */
@@ -267,7 +267,7 @@ int store_pixels( char * filename, animated_gif * image )
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Green
             +
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Blue
-            )/3 ;
+          )/3 ;
     if ( moy < 0 ) moy = 0 ;
     if ( moy > 255 ) moy = 255 ;
 
@@ -571,7 +571,7 @@ int store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void
+    void
 apply_gray_filter( animated_gif * image )
 {
     int i, j ;
@@ -612,15 +612,15 @@ void apply_gray_line( animated_gif * image )
         {
             for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
             {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
+                p[i][CONV(j,k,image->width[i])].r = 0 ;
+                p[i][CONV(j,k,image->width[i])].g = 0 ;
+                p[i][CONV(j,k,image->width[i])].b = 0 ;
             }
         }
     }
 }
 
-void
+    void
 apply_blur_filter( animated_gif * image, int size, int threshold )
 {
     int i, j, k ;
@@ -653,15 +653,15 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
             n_iter++ ;
 
 
-	for(j=0; j<height-1; j++)
-	{
-		for(k=0; k<width-1; k++)
-		{
-			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-		}
-	}
+            for(j=0; j<height-1; j++)
+            {
+                for(k=0; k<width-1; k++)
+                {
+                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
+                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
+                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
+                }
+            }
 
             /* Apply blur on top part of image (10%) */
             for(j=size; j<height/10-size; j++)
@@ -741,9 +741,9 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
                     if ( diff_r > threshold || -diff_r > threshold 
                             ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
+                            diff_g > threshold || -diff_g > threshold
+                            ||
+                            diff_b > threshold || -diff_b > threshold
                        ) {
                         end = 0 ;
                     }
@@ -758,7 +758,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
         while ( threshold > 0 && !end ) ;
 
 #if SOBELF_DEBUG
-	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
+        printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
 #endif
 
         free (new) ;
@@ -766,7 +766,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
 }
 
-void
+    void
 apply_sobel_filter( animated_gif * image )
 {
     int i, j, k ;
@@ -863,6 +863,7 @@ int main( int argc, char ** argv )
     animated_gif * image ;
     struct timeval t1, t2;
     double duration ;
+
 
     /* Check command-line arguments */
     if ( argc < 3 )
