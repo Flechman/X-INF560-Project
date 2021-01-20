@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
+#include <mpi.h>
 
 #include "gif_lib.h"
 
@@ -847,6 +848,16 @@ apply_sobel_filter( animated_gif * image )
  */
 int main( int argc, char ** argv )
 {
+
+    int rank, size;
+
+    /* MPI Initialization */
+    MPI_Init(&argc, &argv);
+
+    /* Get the rank of the current task and the number of MPI processes */
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     char * input_filename ; 
     char * output_filename ;
     animated_gif * image ;
@@ -917,5 +928,6 @@ int main( int argc, char ** argv )
 
     printf( "Export done in %lf s in file %s\n", duration, output_filename ) ;
 
+    MPI_Finalize();
     return 0 ;
 }
