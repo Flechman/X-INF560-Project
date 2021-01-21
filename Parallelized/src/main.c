@@ -571,14 +571,19 @@ int store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-    void
-apply_gray_filter( animated_gif * image )
+void apply_gray_filter( animated_gif * image, int rank, int size )
 {
     int i, j ;
     pixel ** p ;
 
     p = image->p ;
 
+    /*
+     * Either parallelize the images or based on each image
+     *
+     */
+
+    printf("Total size =%d\t My rank is %d\t No of images %d\n", size, rank, image->n_images);
     for ( i = 0 ; i < image->n_images ; i++ )
     {
         for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
@@ -899,7 +904,7 @@ int main( int argc, char ** argv )
     gettimeofday(&t1, NULL);
 
     /* Convert the pixels into grayscale */
-    apply_gray_filter( image ) ;
+    apply_gray_filter( image,  rank, size) ;
 
     /* Apply blur filter with convergence value */
     apply_blur_filter( image, 5, 20 ) ;
