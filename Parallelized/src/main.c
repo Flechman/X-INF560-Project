@@ -583,7 +583,7 @@ void apply_gray_filter( animated_gif * image, int rank, int size )
      *
      */
 
-    if( image->n_images > size ) {
+    if( image->n_images => size ) {
         printf("\nTotal no of images = %d \t Size = %d\n", image->n_images, size);
         image_limits* limits = set_rank_limits(size, image->n_images, rank);
 
