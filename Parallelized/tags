@@ -1,0 +1,14 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+CC	Makefile	/^CC=mpicc$/;"	m
+CFLAGS	Makefile	/^CFLAGS=-O3 -I$(HEADER_DIR)$/;"	m
+HEADER_DIR	Makefile	/^HEADER_DIR=include$/;"	m
+LDFLAGS	Makefile	/^LDFLAGS=-lm$/;"	m
+OBJ	Makefile	/^OBJ= $(OBJ_DIR)\/dgif_lib.o \\$/;"	m
+OBJ_DIR	Makefile	/^OBJ_DIR=obj$/;"	m
+SRC	Makefile	/^SRC= dgif_lib.c \\$/;"	m
+SRC_DIR	Makefile	/^SRC_DIR=src$/;"	m

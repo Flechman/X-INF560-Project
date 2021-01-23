@@ -1,0 +1,132 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+ABS	quantize.c	19;"	d	file:
+BITS_PER_PRIM_COLOR	quantize.c	22;"	d	file:
+COLOR_ARRAY_SIZE	quantize.c	21;"	d	file:
+CONV	main.c	599;"	d	file:
+CodeMask	egif_lib.c	/^static const GifPixelType CodeMask[] = {$/;"	v	file:
+Count	quantize.c	/^    long Count;$/;"	m	struct:QuantizedColorType	file:
+Count	quantize.c	/^    unsigned long Count; \/* Total number of pixels in all the entries *\/$/;"	m	struct:NewColorMapType	file:
+DGifBufferedInput	dgif_lib.c	/^DGifBufferedInput(GifFileType *GifFile, GifByteType *Buf, GifByteType *NextByte)$/;"	f	file:
+DGifCloseFile	dgif_lib.c	/^DGifCloseFile(GifFileType *GifFile, int *ErrorCode)$/;"	f
+DGifDecompressInput	dgif_lib.c	/^DGifDecompressInput(GifFileType *GifFile, int *Code)$/;"	f	file:
+DGifDecompressLine	dgif_lib.c	/^DGifDecompressLine(GifFileType *GifFile, GifPixelType *Line, int LineLen)$/;"	f	file:
+DGifExtensionToGCB	dgif_lib.c	/^int DGifExtensionToGCB(const size_t GifExtensionLength,$/;"	f
+DGifGetCode	dgif_lib.c	/^DGifGetCode(GifFileType *GifFile, int *CodeSize, GifByteType **CodeBlock)$/;"	f
+DGifGetCodeNext	dgif_lib.c	/^DGifGetCodeNext(GifFileType *GifFile, GifByteType **CodeBlock)$/;"	f
+DGifGetExtension	dgif_lib.c	/^DGifGetExtension(GifFileType *GifFile, int *ExtCode, GifByteType **Extension)$/;"	f
+DGifGetExtensionNext	dgif_lib.c	/^DGifGetExtensionNext(GifFileType *GifFile, GifByteType ** Extension)$/;"	f
+DGifGetImageDesc	dgif_lib.c	/^DGifGetImageDesc(GifFileType *GifFile)$/;"	f
+DGifGetLZCodes	dgif_lib.c	/^DGifGetLZCodes(GifFileType *GifFile, int *Code)$/;"	f
+DGifGetLine	dgif_lib.c	/^DGifGetLine(GifFileType *GifFile, GifPixelType *Line, int LineLen)$/;"	f
+DGifGetPixel	dgif_lib.c	/^DGifGetPixel(GifFileType *GifFile, GifPixelType Pixel)$/;"	f
+DGifGetPrefixChar	dgif_lib.c	/^DGifGetPrefixChar(GifPrefixType *Prefix, int Code, int ClearCode)$/;"	f	file:
+DGifGetRecordType	dgif_lib.c	/^DGifGetRecordType(GifFileType *GifFile, GifRecordType* Type)$/;"	f
+DGifGetScreenDesc	dgif_lib.c	/^DGifGetScreenDesc(GifFileType *GifFile)$/;"	f
+DGifGetWord	dgif_lib.c	/^DGifGetWord(GifFileType *GifFile, GifWord *Word)$/;"	f	file:
+DGifOpen	dgif_lib.c	/^DGifOpen(void *userData, InputFunc readFunc, int *Error)$/;"	f
+DGifOpenFileHandle	dgif_lib.c	/^DGifOpenFileHandle(int FileHandle, int *Error)$/;"	f
+DGifOpenFileName	dgif_lib.c	/^DGifOpenFileName(const char *FileName, int *Error)$/;"	f
+DGifSavedExtensionToGCB	dgif_lib.c	/^int DGifSavedExtensionToGCB(GifFileType *GifFile,$/;"	f
+DGifSetupDecompress	dgif_lib.c	/^DGifSetupDecompress(GifFileType *GifFile)$/;"	f	file:
+DGifSlurp	dgif_lib.c	/^DGifSlurp(GifFileType *GifFile)$/;"	f
+DumpColorMap	gifalloc.c	/^DumpColorMap(ColorMapObject *Object,$/;"	f
+EGifBufferedOutput	egif_lib.c	/^EGifBufferedOutput(GifFileType *GifFile,$/;"	f	file:
+EGifCloseFile	egif_lib.c	/^EGifCloseFile(GifFileType *GifFile, int *ErrorCode)$/;"	f
+EGifCompressLine	egif_lib.c	/^EGifCompressLine(GifFileType *GifFile,$/;"	f	file:
+EGifCompressOutput	egif_lib.c	/^EGifCompressOutput(GifFileType *GifFile,$/;"	f	file:
+EGifGCBToExtension	egif_lib.c	/^size_t EGifGCBToExtension(const GraphicsControlBlock *GCB,$/;"	f
+EGifGCBToSavedExtension	egif_lib.c	/^int EGifGCBToSavedExtension(const GraphicsControlBlock *GCB, $/;"	f
+EGifGetGifVersion	egif_lib.c	/^EGifGetGifVersion(GifFileType *GifFile)$/;"	f
+EGifOpen	egif_lib.c	/^EGifOpen(void *userData, OutputFunc writeFunc, int *Error)$/;"	f
+EGifOpenFileHandle	egif_lib.c	/^EGifOpenFileHandle(const int FileHandle, int *Error)$/;"	f
+EGifOpenFileName	egif_lib.c	/^EGifOpenFileName(const char *FileName, const bool TestExistence, int *Error)$/;"	f
+EGifPutCode	egif_lib.c	/^EGifPutCode(GifFileType *GifFile, int CodeSize, const GifByteType *CodeBlock)$/;"	f
+EGifPutCodeNext	egif_lib.c	/^EGifPutCodeNext(GifFileType *GifFile, const GifByteType *CodeBlock)$/;"	f
+EGifPutComment	egif_lib.c	/^EGifPutComment(GifFileType *GifFile, const char *Comment)$/;"	f
+EGifPutExtension	egif_lib.c	/^EGifPutExtension(GifFileType *GifFile,$/;"	f
+EGifPutExtensionBlock	egif_lib.c	/^EGifPutExtensionBlock(GifFileType *GifFile, $/;"	f
+EGifPutExtensionLeader	egif_lib.c	/^EGifPutExtensionLeader(GifFileType *GifFile, const int ExtCode)$/;"	f
+EGifPutExtensionTrailer	egif_lib.c	/^EGifPutExtensionTrailer(GifFileType *GifFile) {$/;"	f
+EGifPutImageDesc	egif_lib.c	/^EGifPutImageDesc(GifFileType *GifFile,$/;"	f
+EGifPutLine	egif_lib.c	/^EGifPutLine(GifFileType * GifFile, GifPixelType *Line, int LineLen)$/;"	f
+EGifPutPixel	egif_lib.c	/^EGifPutPixel(GifFileType *GifFile, GifPixelType Pixel)$/;"	f
+EGifPutScreenDesc	egif_lib.c	/^EGifPutScreenDesc(GifFileType *GifFile,$/;"	f
+EGifPutWord	egif_lib.c	/^EGifPutWord(int Word, GifFileType *GifFile)$/;"	f	file:
+EGifSetGifVersion	egif_lib.c	/^void EGifSetGifVersion(GifFileType *GifFile, const bool gif89)$/;"	f
+EGifSetupCompress	egif_lib.c	/^EGifSetupCompress(GifFileType *GifFile)$/;"	f	file:
+EGifSpew	egif_lib.c	/^EGifSpew(GifFileType *GifFileOut) $/;"	f
+EGifWriteExtensions	egif_lib.c	/^EGifWriteExtensions(GifFileType *GifFileOut, $/;"	f	file:
+FreeLastSavedImage	gifalloc.c	/^FreeLastSavedImage(GifFileType *GifFile)$/;"	f
+GifAddExtensionBlock	gifalloc.c	/^GifAddExtensionBlock(int *ExtensionBlockCount,$/;"	f
+GifApplyTranslation	gifalloc.c	/^GifApplyTranslation(SavedImage *Image, GifPixelType Translation[])$/;"	f
+GifAsciiTable8x8	gif_font.c	/^const unsigned char GifAsciiTable8x8[][GIF_FONT_WIDTH] = {$/;"	v
+GifBitSize	gifalloc.c	/^GifBitSize(int n)$/;"	f
+GifDrawBox	gif_font.c	/^GifDrawBox(SavedImage *Image,$/;"	f
+GifDrawBoxedText8x8	gif_font.c	/^GifDrawBoxedText8x8(SavedImage *Image,$/;"	f
+GifDrawRectangle	gif_font.c	/^GifDrawRectangle(SavedImage *Image,$/;"	f
+GifDrawText8x8	gif_font.c	/^GifDrawText8x8(SavedImage *Image, $/;"	f
+GifErrorString	gif_err.c	/^GifErrorString(int ErrorCode)$/;"	f
+GifFreeExtensions	gifalloc.c	/^GifFreeExtensions(int *ExtensionBlockCount,$/;"	f
+GifFreeMapObject	gifalloc.c	/^GifFreeMapObject(ColorMapObject *Object)$/;"	f
+GifFreeSavedImages	gifalloc.c	/^GifFreeSavedImages(GifFileType *GifFile)$/;"	f
+GifMakeMapObject	gifalloc.c	/^GifMakeMapObject(int ColorCount, const GifColorType *ColorMap)$/;"	f
+GifMakeSavedImage	gifalloc.c	/^GifMakeSavedImage(GifFileType *GifFile, const SavedImage *CopyFrom)$/;"	f
+GifQuantizeBuffer	quantize.c	/^GifQuantizeBuffer(unsigned int Width,$/;"	f
+GifUnionColorMap	gifalloc.c	/^GifUnionColorMap(const ColorMapObject *ColorIn1,$/;"	f
+HIBYTE	egif_lib.c	45;"	d	file:
+HashTablePrintHitRatio	gif_hash.c	/^void HashTablePrintHitRatio(void)$/;"	f
+InternalWrite	egif_lib.c	/^static int InternalWrite(GifFileType *GifFileOut, $/;"	f	file:
+KeyItem	gif_hash.c	/^static int KeyItem(uint32_t Item)$/;"	f	file:
+LOBYTE	egif_lib.c	44;"	d	file:
+MAX	gifalloc.c	13;"	d	file:
+MAX_PRIM_COLOR	quantize.c	23;"	d	file:
+MUL_NO_OVERFLOW	openbsd-reallocarray.c	27;"	d	file:
+NewColorIndex	quantize.c	/^    GifByteType NewColorIndex;$/;"	m	struct:QuantizedColorType	file:
+NewColorMapType	quantize.c	/^typedef struct NewColorMapType {$/;"	s	file:
+NewColorMapType	quantize.c	/^} NewColorMapType;$/;"	t	typeref:struct:NewColorMapType	file:
+NumEntries	quantize.c	/^    unsigned int NumEntries; \/* # of QuantizedColorType in linked list below *\/$/;"	m	struct:NewColorMapType	file:
+NumberOfMisses	gif_hash.c	/^	    NumberOfMisses = 0;$/;"	v	file:
+NumberOfTests	gif_hash.c	/^static long NumberOfTests = 0,$/;"	v	file:
+Pnext	quantize.c	/^    struct QuantizedColorType *Pnext;$/;"	m	struct:QuantizedColorType	typeref:struct:QuantizedColorType::QuantizedColorType	file:
+QuantizedColorType	quantize.c	/^typedef struct QuantizedColorType {$/;"	s	file:
+QuantizedColorType	quantize.c	/^} QuantizedColorType;$/;"	t	typeref:struct:QuantizedColorType	file:
+QuantizedColors	quantize.c	/^    QuantizedColorType *QuantizedColors;$/;"	m	struct:NewColorMapType	file:
+READ	dgif_lib.c	30;"	d	file:
+RGB	quantize.c	/^    GifByteType RGB[3];$/;"	m	struct:QuantizedColorType	file:
+RGBMin	quantize.c	/^    GifByteType RGBMin[3], RGBWidth[3];$/;"	m	struct:NewColorMapType	file:
+RGBWidth	quantize.c	/^    GifByteType RGBMin[3], RGBWidth[3];$/;"	m	struct:NewColorMapType	file:
+SOBELF_DEBUG	main.c	15;"	d	file:
+SortCmpRtn	quantize.c	/^SortCmpRtn(const void *Entry1,$/;"	f	file:
+SortRGBAxis	quantize.c	/^static int SortRGBAxis;$/;"	v	file:
+SubdivColorMap	quantize.c	/^SubdivColorMap(NewColorMapType * NewColorSubdiv,$/;"	f	file:
+UNSIGNED_LITTLE_ENDIAN	dgif_lib.c	27;"	d	file:
+_ClearHashTable	gif_hash.c	/^void _ClearHashTable(GifHashTableType *HashTable)$/;"	f
+_ExistsHashTable	gif_hash.c	/^int _ExistsHashTable(GifHashTableType *HashTable, uint32_t Key)$/;"	f
+_InitHashTable	gif_hash.c	/^GifHashTableType *_InitHashTable(void)$/;"	f
+_InsertHashTable	gif_hash.c	/^void _InsertHashTable(GifHashTableType *HashTable, uint32_t Key, int Code)$/;"	f
+animated_gif	main.c	/^typedef struct animated_gif$/;"	s	file:
+animated_gif	main.c	/^} animated_gif ;$/;"	t	typeref:struct:animated_gif	file:
+apply_blur_filter	main.c	/^apply_blur_filter( animated_gif * image, int size, int threshold )$/;"	f
+apply_gray_filter	main.c	/^apply_gray_filter( animated_gif * image )$/;"	f
+apply_gray_line	main.c	/^void apply_gray_line( animated_gif * image ) $/;"	f
+apply_sobel_filter	main.c	/^apply_sobel_filter( animated_gif * image )$/;"	f
+b	main.c	/^    int b ; \/* Blue *\/$/;"	m	struct:pixel	file:
+g	main.c	/^    GifFileType * g ; \/* Internal representation.$/;"	m	struct:animated_gif	file:
+g	main.c	/^    int g ; \/* Green *\/$/;"	m	struct:pixel	file:
+height	main.c	/^    int * height ; \/* Height of each image *\/$/;"	m	struct:animated_gif	file:
+load_pixels	main.c	/^animated_gif* load_pixels( char * filename ) $/;"	f
+main	main.c	/^int main( int argc, char ** argv )$/;"	f
+n_images	main.c	/^    int n_images ; \/* Number of images *\/$/;"	m	struct:animated_gif	file:
+output_modified_read_gif	main.c	/^int output_modified_read_gif( char * filename, GifFileType * g ) $/;"	f
+p	main.c	/^    pixel ** p ; \/* Pixels of each image *\/$/;"	m	struct:animated_gif	file:
+pixel	main.c	/^typedef struct pixel$/;"	s	file:
+pixel	main.c	/^} pixel ;$/;"	t	typeref:struct:pixel	file:
+r	main.c	/^    int r ; \/* Red *\/$/;"	m	struct:pixel	file:
+reallocarray	openbsd-reallocarray.c	/^reallocarray(void *optr, size_t nmemb, size_t size)$/;"	f
+store_pixels	main.c	/^int store_pixels( char * filename, animated_gif * image )$/;"	f
+width	main.c	/^    int * width ; \/* Width of each image *\/$/;"	m	struct:animated_gif	file:
