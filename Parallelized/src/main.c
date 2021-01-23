@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include <mpi.h>
-
+#include <mpi.h> 
 #include "gif_lib.h"
+#include "__shared/functions.h"
 
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
@@ -583,22 +583,47 @@ void apply_gray_filter( animated_gif * image, int rank, int size )
      *
      */
 
-    printf("Total size =%d\t My rank is %d\t No of images %d\n", size, rank, image->n_images);
-    for ( i = 0 ; i < image->n_images ; i++ )
-    {
-        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
-        {
-            int moy ;
+    if( image->n_images > size ) {
+        printf("\nTotal no of images = %d \t Size = %d\n", image->n_images, size);
+        image_limits* limits = set_rank_limits(size, image->n_images, rank);
 
-            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-            if ( moy < 0 ) moy = 0 ;
-            if ( moy > 255 ) moy = 255 ;
-
-            p[i][j].r = moy ;
-            p[i][j].g = moy ;
-            p[i][j].b = moy ;
+        printf("\nRank = %d-> start = %d, end = %d\n", rank, (limits+rank)->start, (limits+rank)->finish);
+        if (limits == NULL) {
+            fprintf( stderr, "Unable to allocate %d elements", size);
         }
+
+
+        for ( i = (limits+rank)->start; i < (limits+rank)->finish; i++ )
+            for ( j = 0; j < image->width[i] * image->height[i]; j++ ) {
+                int moy ;
+
+                moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
+                if ( moy < 0 ) moy = 0 ;
+                if ( moy > 255 ) moy = 255 ;
+
+                p[i][j].r = moy ;
+                p[i][j].g = moy ;
+                p[i][j].b = moy ;
+            }
     }
+
+    else
+        for ( i = 0 ; i < image->n_images ; i++ )
+        {
+
+            for ( j = 0 ; j < image->width[i] * image->height[i]; j++ )
+            {
+                int moy ;
+
+                moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
+                if ( moy < 0 ) moy = 0 ;
+                if ( moy > 255 ) moy = 255 ;
+
+                p[i][j].r = moy ;
+                p[i][j].g = moy ;
+                p[i][j].b = moy ;
+            }
+        }
 }
 
 #define CONV(l,c,nb_c) \
@@ -907,10 +932,10 @@ int main( int argc, char ** argv )
     apply_gray_filter( image,  rank, size) ;
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter( image, 5, 20 ) ;
+    //apply_blur_filter( image, 5, 20 ) ;
 
     /* Apply sobel filter on pixels */
-    apply_sobel_filter( image ) ;
+    //apply_sobel_filter( image ) ;
 
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
@@ -923,6 +948,9 @@ int main( int argc, char ** argv )
 
     /* EXPORT Timer start */
     gettimeofday(&t1, NULL);
+
+
+    printf("\nSize of image after filter : %d\n", image->n_images); 
 
     /* Store file from array of pixels to GIF file */
     if ( !store_pixels( output_filename, image ) ) { return 1 ; }
