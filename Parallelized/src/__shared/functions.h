@@ -34,6 +34,10 @@ typedef struct {
 
 image_limits* set_rank_limits( int processes, int images, int rank) {
 
+    if ( images < processes && images != 0 ){
+        processes = images;
+    }
+
     int parts = images / processes;
     int size = images;
     int remainder = images % processes;
@@ -41,16 +45,13 @@ image_limits* set_rank_limits( int processes, int images, int rank) {
     image_limits* limits = calloc(processes, sizeof(image_limits));
 
     if ( images >= processes){
-        while( size - parts >= 0 ) {
-            int rank_start = rank * parts;
-            int rank_finish = (rank_start + parts) - 1;
+        int rank_start = rank * parts;
+        int rank_finish = (rank_start + parts);
 
-            (limits + rank)->start = rank_start;
-            (limits +rank)->finish = rank_finish;
+        (limits + rank)->start = rank_start;
+        (limits +rank)->finish = rank_finish;
 
-            size -= parts;
-        }
-        (limits + remainder)->finish += remainder;
+        (limits + (processes - 1))->finish += remainder;
         return limits;
     }
     else {
