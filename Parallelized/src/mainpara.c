@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include <mpi.h> 
+#include <mpi.h>
+
 #include "gif_lib.h"
-#include "filters/gray_filter.h"
 
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
@@ -28,6 +28,8 @@ typedef struct animated_gif
     int n_images ; /* Number of images */
     int * width ; /* Width of each image */
     int * height ; /* Height of each image */
+    int * actualWidth ; /* Actual width of each image */
+    int * actualHeight ;  /* Actual height of each image */
     pixel ** p ; /* Pixels of each image */
     GifFileType * g ; /* Internal representation.
                          DO NOT MODIFY */
@@ -37,14 +39,17 @@ typedef struct animated_gif
  * Load a GIF image from a file and return a
  * structure of type animated_gif.
  */
-animated_gif* load_pixels( char * filename ) 
+animated_gif *load_pixels(char *filename int rank, int size)
 {
     GifFileType * g ;
     ColorMapObject * colmap ;
     int error ;
+    int n ;
     int n_images ;
     int * width ;
     int * height ;
+    int * actualWidth ;
+    int * actualHeight ;
     pixel ** p ;
     int i ;
     animated_gif * image ;
@@ -67,108 +72,156 @@ animated_gif* load_pixels( char * filename )
     }
 
     /* Grab the number of images and the size of each image */
-    n_images = g->ImageCount ;
+    n = g->ImageCount ;
 
-    width = (int *)malloc( n_images * sizeof( int ) ) ;
-    if ( width == NULL )
+    //The index of the image at which this process starts
+    int imgStartIndex = (n/size) * rank;
+    //The index of the image at which this process ends
+    int imgEndIndex = (n/size) * (rank+1);
+    //The fraction of the image 'imgStartIndex' at which the process starts
+    double start = rank * ((double)n / (double)size) - imgStartIndex;
+    //The fraction of the image 'imgEndIndex' at which the process ends
+    double end = (rank + 1) * ((double)n / (double)size) - imgEndIndex;
+    //Number of images on which this process works on (contiguous images)
+    n_images = imgEndIndex - imgStartIndex + 1;
+
+    /* Allocate width and height */
+    width = (int *)malloc(n_images * sizeof(int));
+    if (width == NULL)
     {
-        fprintf( stderr, "Unable to allocate width of size %d\n",
-                n_images ) ;
-        return 0 ;
+        fprintf(stderr, "Unable to allocate width of size %d\n",
+                n_images);
+        return 0;
     }
-
-    height = (int *)malloc( n_images * sizeof( int ) ) ;
-    if ( height == NULL )
+    height = (int *)malloc(n_images * sizeof(int));
+    if (height == NULL)
     {
-        fprintf( stderr, "Unable to allocate height of size %d\n",
-                n_images ) ;
-        return 0 ;
+        fprintf(stderr, "Unable to allocate height of size %d\n",
+                n_images);
+        return 0;
+    }
+    actualWidth = (int *)malloc(n_images * sizeof(int));
+    if (actualWidth == NULL)
+    {
+        fprintf(stderr, "Unable to allocate width of size %d\n",
+                n_images);
+        return 0;
+    }
+    actualHeight = (int *)malloc(n_images * sizeof(int));
+    if (height == NULL)
+    {
+        fprintf(stderr, "Unable to allocate height of size %d\n",
+                n_images);
+        return 0;
     }
 
     /* Fill the width and height */
-    for ( i = 0 ; i < n_images ; i++ ) 
+    /* NOT CORRECT YET */
+    /* If distribution of the image not perfectly balanced, convention that the last portion of the image will take the 1 pixel more (=> ceil for the first, and floot for the second) */
+    double tmpStart = start;
+    for (i = 0; i < n_images; i++)
     {
-        width[i] = g->SavedImages[i].ImageDesc.Width ;
-        height[i] = g->SavedImages[i].ImageDesc.Height ;
-
-#if SOBELF_DEBUG
-        printf( "Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
-                i, 
-                g->SavedImages[i].ImageDesc.Left,
-                g->SavedImages[i].ImageDesc.Top,
-                g->SavedImages[i].ImageDesc.Width,
-                g->SavedImages[i].ImageDesc.Height,
-                g->SavedImages[i].ImageDesc.Interlace,
-                g->SavedImages[i].ImageDesc.ColorMap
-              ) ;
-#endif
+        int i2 = imgStartIndex+i;
+        actualWidth[i] = g->SavedImages[i2].ImageDesc.Width;
+        actualHeight[i] = g->SavedImages[i2].ImageDesc.Height;
+        if(i < n_images-1) {
+            int w = (1 - tmpStart) * actualWidth[i];
+            int h = (1 - tmpStart) * actualHeight[i];
+            width[i] = floor(w) + actualWidth[i] % (size / gcd(size, n)); //WORK ON THIS PART TO SOLVE THE EXTRA PIXELS ISSUE
+            height[i] = floor(h) + actualHeight[i] % (size / gcd(size, n));
+            tmpStart = 0;
+        } else {
+            //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
+            int w = (end - tmpStart) * actualWidth[i];
+            int h = (end - tmpStart) * actualHeight[i];
+            width[i] = floor(w);
+            height[i] = floor(h);
+            #if SOBELF_DEBUG
+            printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
+                i2,
+                g->SavedImages[i2].ImageDesc.Left,
+                g->SavedImages[i2].ImageDesc.Top,
+                g->SavedImages[i2].ImageDesc.Width,
+                g->SavedImages[i2].ImageDesc.Height,
+                g->SavedImages[i2].ImageDesc.Interlace,
+                g->SavedImages[i2].ImageDesc.ColorMap);
+            #endif
+        }
     }
-
 
     /* Get the global colormap */
-    colmap = g->SColorMap ;
-    if ( colmap == NULL ) 
+    colmap = g->SColorMap;
+    if (colmap == NULL)
     {
-        fprintf( stderr, "Error global colormap is NULL\n" ) ;
-        return NULL ;
+        fprintf(stderr, "Error global colormap is NULL\n");
+        return NULL;
     }
 
-#if SOBELF_DEBUG
-    printf( "Global color map: count:%d bpp:%d sort:%d\n",
-            g->SColorMap->ColorCount,
-            g->SColorMap->BitsPerPixel,
-            g->SColorMap->SortFlag
-          ) ;
-#endif
+    #if SOBELF_DEBUG
+    printf("Global color map: count:%d bpp:%d sort:%d\n",
+           g->SColorMap->ColorCount,
+           g->SColorMap->BitsPerPixel,
+           g->SColorMap->SortFlag);
+    #endif
 
     /* Allocate the array of pixels to be returned */
-    p = (pixel **)malloc( n_images * sizeof( pixel * ) ) ;
-    if ( p == NULL )
+    p = (pixel **)malloc(n_images * sizeof(pixel *));
+    if (p == NULL)
     {
-        fprintf( stderr, "Unable to allocate array of %d images\n",
-                n_images ) ;
-        return NULL ;
+        fprintf(stderr, "Unable to allocate array of %d images\n",
+                n_images);
+        return NULL;
     }
-
-    for ( i = 0 ; i < n_images ; i++ ) 
+    for (i = 0; i < n_images; i++)
     {
-        p[i] = (pixel *)malloc( width[i] * height[i] * sizeof( pixel ) ) ;
-        if ( p[i] == NULL )
+        p[i] = (pixel *)malloc(width[i] * height[i] * sizeof(pixel));
+        if (p[i] == NULL)
         {
-            fprintf( stderr, "Unable to allocate %d-th array of %d pixels\n",
-                    i, width[i] * height[i] ) ;
-            return NULL ;
+            fprintf(stderr, "Unable to allocate %d-th array of %d pixels\n",
+                    i, width[i] * height[i]);
+            return NULL;
         }
     }
 
     /* Fill pixels */
+    int startIndexWidth = floor(start * actualWidth[0]);
+    int startIndexHeight = floor(start * actualHeight[0]);
 
     /* For each image */
-    for ( i = 0 ; i < n_images ; i++ )
+    for (i = 0; i < n_images; i++)
     {
-        int j ;
+        int j;
+        int k;
+        int i2 = imgStartIndex + i;
 
         /* Get the local colormap if needed */
-        if ( g->SavedImages[i].ImageDesc.ColorMap )
+        if (g->SavedImages[i2].ImageDesc.ColorMap)
         {
 
             /* TODO No support for local color map */
-            fprintf( stderr, "Error: application does not support local colormap\n" ) ;
-            return NULL ;
+            fprintf(stderr, "Error: application does not support local colormap\n");
+            return NULL;
 
-            colmap = g->SavedImages[i].ImageDesc.ColorMap ;
+            colmap = g->SavedImages[i2].ImageDesc.ColorMap;
         }
 
         /* Traverse the image and fill pixels */
-        for ( j = 0 ; j < width[i] * height[i] ; j++ ) 
+        for (j = startIndexHeight; j < startIndexHeight+height[i]; ++j)
         {
-            int c ;
+            for (k = startIndexWidth; k < startIndexWidth+width[i]; ++k)
+            {
+                int c = g->SavedImages[i2].RasterBits[j * actualWidth[i] + k];
+                int j2 = j-startIndexHeight;
+                int k2 = k-startIndexWidth;
 
-            c = g->SavedImages[i].RasterBits[j] ;
-
-            p[i][j].r = colmap->Colors[c].Red ;
-            p[i][j].g = colmap->Colors[c].Green ;
-            p[i][j].b = colmap->Colors[c].Blue ;
+                p[i][j2 * width[i] + k2].r = colmap->Colors[c].Red;
+                p[i][j2 * width[i] + k2].g = colmap->Colors[c].Green;
+                p[i][j2 * width[i] + k2].b = colmap->Colors[c].Blue;
+            }
+        }
+        if (i < n_images - 1) {
+            startIndexWidth = 0;
+            startIndexHeight = 0;
         }
     }
 
@@ -184,13 +237,15 @@ animated_gif* load_pixels( char * filename )
     image->n_images = n_images ;
     image->width = width ;
     image->height = height ;
+    image->actualWidth = actualWidth ;
+    image->actualHeight = actualHeight ;
     image->p = p ;
     image->g = g ;
 
-#if SOBELF_DEBUG
-    printf( "-> GIF w/ %d image(s) with first image of size %d x %d\n",
+    #if SOBELF_DEBUG
+        printf( "-> GIF w/ %d image(s) with first image of size %d x %d\n",
             image->n_images, image->width[0], image->height[0] ) ;
-#endif
+    #endif
 
     return image ;
 }
@@ -267,7 +322,7 @@ int store_pixels( char * filename, animated_gif * image )
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Green
             +
             image->g->SColorMap->Colors[ image->g->SBackGroundColor ].Blue
-          )/3 ;
+            )/3 ;
     if ( moy < 0 ) moy = 0 ;
     if ( moy > 255 ) moy = 255 ;
 
@@ -571,59 +626,29 @@ int store_pixels( char * filename, animated_gif * image )
     return 1 ;
 }
 
-void apply_gray_filter( animated_gif * image, int rank, int size )
+void
+apply_gray_filter( animated_gif * image )
 {
     int i, j ;
     pixel ** p ;
 
     p = image->p ;
 
-    /*
-     * Either parallelize the images or based on each image
-     *
-     */
-
-    if( image->n_images => size ) {
-        printf("\nTotal no of images = %d \t Size = %d\n", image->n_images, size);
-        image_limits* limits = set_rank_limits(size, image->n_images, rank);
-
-        printf("\nRank = %d-> start = %d, end = %d\n", rank, (limits+rank)->start, (limits+rank)->finish);
-        if (limits == NULL) {
-            fprintf( stderr, "Unable to allocate %d elements", size);
-        }
-
-
-        for ( i = (limits+rank)->start; i < (limits+rank)->finish; i++ )
-            for ( j = 0; j < image->width[i] * image->height[i]; j++ ) {
-                int moy ;
-
-                moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-                if ( moy < 0 ) moy = 0 ;
-                if ( moy > 255 ) moy = 255 ;
-
-                p[i][j].r = moy ;
-                p[i][j].g = moy ;
-                p[i][j].b = moy ;
-            }
-    }
-
-    else
-        for ( i = 0 ; i < image->n_images ; i++ )
+    for ( i = 0 ; i < image->n_images ; i++ )
+    {
+        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
         {
+            int moy ;
 
-            for ( j = 0 ; j < image->width[i] * image->height[i]; j++ )
-            {
-                int moy ;
+            moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
+            if ( moy < 0 ) moy = 0 ;
+            if ( moy > 255 ) moy = 255 ;
 
-                moy = (p[i][j].r + p[i][j].g + p[i][j].b)/3 ;
-                if ( moy < 0 ) moy = 0 ;
-                if ( moy > 255 ) moy = 255 ;
-
-                p[i][j].r = moy ;
-                p[i][j].g = moy ;
-                p[i][j].b = moy ;
-            }
+            p[i][j].r = moy ;
+            p[i][j].g = moy ;
+            p[i][j].b = moy ;
         }
+    }
 }
 
 #define CONV(l,c,nb_c) \
@@ -642,15 +667,15 @@ void apply_gray_line( animated_gif * image )
         {
             for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
             {
-                p[i][CONV(j,k,image->width[i])].r = 0 ;
-                p[i][CONV(j,k,image->width[i])].g = 0 ;
-                p[i][CONV(j,k,image->width[i])].b = 0 ;
+            p[i][CONV(j,k,image->width[i])].r = 0 ;
+            p[i][CONV(j,k,image->width[i])].g = 0 ;
+            p[i][CONV(j,k,image->width[i])].b = 0 ;
             }
         }
     }
 }
 
-    void
+void
 apply_blur_filter( animated_gif * image, int size, int threshold )
 {
     int i, j, k ;
@@ -683,15 +708,15 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
             n_iter++ ;
 
 
-            for(j=0; j<height-1; j++)
-            {
-                for(k=0; k<width-1; k++)
-                {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-                }
-            }
+	for(j=0; j<height-1; j++)
+	{
+		for(k=0; k<width-1; k++)
+		{
+			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
+			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
+			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
+		}
+	}
 
             /* Apply blur on top part of image (10%) */
             for(j=size; j<height/10-size; j++)
@@ -771,9 +796,9 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
                     if ( diff_r > threshold || -diff_r > threshold 
                             ||
-                            diff_g > threshold || -diff_g > threshold
-                            ||
-                            diff_b > threshold || -diff_b > threshold
+                             diff_g > threshold || -diff_g > threshold
+                             ||
+                              diff_b > threshold || -diff_b > threshold
                        ) {
                         end = 0 ;
                     }
@@ -788,7 +813,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
         while ( threshold > 0 && !end ) ;
 
 #if SOBELF_DEBUG
-        printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
+	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
 #endif
 
         free (new) ;
@@ -796,7 +821,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
 }
 
-    void
+void
 apply_sobel_filter( animated_gif * image )
 {
     int i, j, k ;
@@ -894,7 +919,6 @@ int main( int argc, char ** argv )
     struct timeval t1, t2;
     double duration ;
 
-
     /* Check command-line arguments */
     if ( argc < 3 )
     {
@@ -911,7 +935,7 @@ int main( int argc, char ** argv )
     gettimeofday(&t1, NULL);
 
     /* Load file and store the pixels in array */
-    image = load_pixels( input_filename ) ;
+    image = load_pixels( input_filename , rank, size ) ;
     if ( image == NULL ) { return 1 ; }
 
     /* IMPORT Timer stop */
@@ -929,7 +953,7 @@ int main( int argc, char ** argv )
     gettimeofday(&t1, NULL);
 
     /* Convert the pixels into grayscale */
-    apply_gray_filter( image,  rank, size) ;
+    apply_gray_filter( image ) ;
 
     /* Apply blur filter with convergence value */
     apply_blur_filter( image, 5, 20 ) ;
@@ -940,17 +964,14 @@ int main( int argc, char ** argv )
     /* FILTER Timer stop */
     gettimeofday(&t2, NULL);
 
-    /*==============================================*/
-
     duration = (t2.tv_sec -t1.tv_sec)+((t2.tv_usec-t1.tv_usec)/1e6);
 
     printf( "SOBEL done in %lf s\n", duration ) ;
 
+    /*==============================================*/
+
     /* EXPORT Timer start */
     gettimeofday(&t1, NULL);
-
-
-    printf("\nSize of image after filter : %d\n", image->n_images); 
 
     /* Store file from array of pixels to GIF file */
     if ( !store_pixels( output_filename, image ) ) { return 1 ; }
