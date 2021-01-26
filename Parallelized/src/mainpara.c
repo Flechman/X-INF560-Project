@@ -75,9 +75,10 @@ animated_gif *load_pixels(char *filename int rank, int size)
     n = g->ImageCount ;
 
     //The index of the image at which this process starts
-    int imgStartIndex = (n/size) * rank;
+    int imgStartIndex = (int)(((double)n/(double)size) * rank);
     //The index of the image at which this process ends
-    int imgEndIndex = (n/size) * (rank+1);
+    int imgEndIndex = (int)(((double)n / (double)size) * (rank + 1)) 
+                        + (((rank + 1) % size == 0) ? -1 : 0); //PROBLEM
     //The fraction of the image 'imgStartIndex' at which the process starts
     double start = rank * ((double)n / (double)size) - imgStartIndex;
     //The fraction of the image 'imgEndIndex' at which the process ends
@@ -125,15 +126,15 @@ animated_gif *load_pixels(char *filename int rank, int size)
         actualWidth[i] = g->SavedImages[i2].ImageDesc.Width;
         actualHeight[i] = g->SavedImages[i2].ImageDesc.Height;
         if(i < n_images-1) {
-            int w = (1 - tmpStart) * actualWidth[i];
-            int h = (1 - tmpStart) * actualHeight[i];
-            width[i] = floor(w) + actualWidth[i] % (size / gcd(size, n)); //WORK ON THIS PART TO SOLVE THE EXTRA PIXELS ISSUE
-            height[i] = floor(h) + actualHeight[i] % (size / gcd(size, n));
+            double w = (1 - tmpStart) * actualWidth[i];
+            double h = (1 - tmpStart) * actualHeight[i];
+            width[i] = floor(w) + computeRemainder(actualWidth[i], w, size, n, tmpStart, imgStartIndex+i);
+            height[i] = floor(h) + computeRemainder(actualHeight[i], h, size, n, tmpStart, imgStartIndex+i);
             tmpStart = 0;
         } else {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            int w = (end - tmpStart) * actualWidth[i];
-            int h = (end - tmpStart) * actualHeight[i];
+            double w = (end - tmpStart) * actualWidth[i];
+            double h = (end - tmpStart) * actualHeight[i];
             width[i] = floor(w);
             height[i] = floor(h);
             #if SOBELF_DEBUG
@@ -248,6 +249,17 @@ animated_gif *load_pixels(char *filename int rank, int size)
     #endif
 
     return image ;
+}
+
+int computeRemainder(int length, double newlength, int size, int n, double startInImage, int imgIndex)
+{
+    int numProc = (n <= size) ? ceil((double)size / (double)n) : (startInImage == 0 ? 1 : 2);
+    double tmp = length * ((double)n / (double)size);
+    double remainder = tmp - (int)tmp;
+    double firstRemainder = (n <= size) ? (((double)n / (double)size) * numProc * imgIndex - imgIndex) : startInImage;
+    double lastRemainder = newlength - (int)newlength;
+
+    return remainder * (numProc - 2) + firstRemainder + lastRemainder;
 }
 
 int output_modified_read_gif( char * filename, GifFileType * g ) 
