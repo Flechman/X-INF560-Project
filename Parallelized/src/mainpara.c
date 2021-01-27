@@ -131,21 +131,23 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             tmpStart = 0;
         } else {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double w = (end - tmpStart) * actualWidth[i];
-            double h = (end - tmpStart) * actualHeight[i];
+            double w = (i >= n) ? 0 : (end - tmpStart) * actualWidth[i];
+            double h = (i >= n) ? 0 : (end - tmpStart) * actualHeight[i];
             width[i] = floor(w);
             height[i] = floor(h);
-            #if SOBELF_DEBUG
-            printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
-                i2,
-                g->SavedImages[i2].ImageDesc.Left,
-                g->SavedImages[i2].ImageDesc.Top,
-                g->SavedImages[i2].ImageDesc.Width,
-                g->SavedImages[i2].ImageDesc.Height,
-                g->SavedImages[i2].ImageDesc.Interlace,
-                g->SavedImages[i2].ImageDesc.ColorMap);
-            #endif
         }
+        #if SOBELF_DEBUG
+            if(i < n) {
+                printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
+                    i2,
+                    g->SavedImages[i2].ImageDesc.Left,
+                    g->SavedImages[i2].ImageDesc.Top,
+                    g->SavedImages[i2].ImageDesc.Width,
+                    g->SavedImages[i2].ImageDesc.Height,
+                    g->SavedImages[i2].ImageDesc.Interlace,
+                    g->SavedImages[i2].ImageDesc.ColorMap);
+            }
+        #endif
     }
 
     /* Get the global colormap */

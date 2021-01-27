@@ -36,8 +36,8 @@ int main(void)
 
     /* Image parameters ; CHANGE HERE PARAMETERS */
     int n_images = 5;
-    int width = 100;
-    int height = 100;
+    int width = 11;
+    int height = 11;
     int size = 10; //Number of processes
 
     animated_gif *image = createImage(n_images, width, height);
@@ -58,7 +58,7 @@ int main(void)
             fprintf(stderr, "Error while loading pixels for process with RANK %d\n", i);
             return 1;
         }
-        printf("Subimage(s) for process %d successfully created !\n ==========================\n", i);
+        printf("Subimage(s) for process %d successfully created !\n==========================\n", i);
         fflush(stdout);
     }
 
@@ -142,7 +142,9 @@ animated_gif *load_pixels(animated_gif * original, int rank, int size)
         actualHeight[i] = original->height[i2];
         printf("  Image #%d for Process %d:\n", i, rank);
         fflush(stdout);
-        printf("    - ActualWidth = %d | ActualHeight = %d\n", actualWidth[i], actualHeight[i]);
+        if(i < n) {
+            printf("    - ActualWidth = %d | ActualHeight = %d\n", actualWidth[i], actualHeight[i]);
+        }
         if (i < n_images - 1)
         {
             double w = (1 - tmpStart) * actualWidth[i];
@@ -158,8 +160,8 @@ animated_gif *load_pixels(animated_gif * original, int rank, int size)
         else
         {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double w = (end - tmpStart) * actualWidth[i];
-            double h = (end - tmpStart) * actualHeight[i];
+            double w = (i >= n) ? 0 : (end - tmpStart) * actualWidth[i];
+            double h = (i >= n) ? 0 : (end - tmpStart) * actualHeight[i];
             width[i] = floor(w);
             height[i] = floor(h);
             #if SOBELF_DEBUG
