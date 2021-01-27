@@ -39,7 +39,7 @@ typedef struct animated_gif
  * Load a GIF image from a file and return a
  * structure of type animated_gif.
  */
-animated_gif *load_pixels(char *filename int rank, int size)
+animated_gif *load_pixels(char *filename, int rank, int size)
 {
     GifFileType * g ;
     ColorMapObject * colmap ;
@@ -71,14 +71,13 @@ animated_gif *load_pixels(char *filename int rank, int size)
         return NULL ;
     }
 
-    /* Grab the number of images and the size of each image */
+    /* Grab the number of images */
     n = g->ImageCount ;
 
     //The index of the image at which this process starts
     int imgStartIndex = (int)(((double)n/(double)size) * rank);
     //The index of the image at which this process ends
-    int imgEndIndex = (int)(((double)n / (double)size) * (rank + 1)) 
-                        + (((rank + 1) % size == 0) ? -1 : 0); //PROBLEM
+    int imgEndIndex = (int)(((double)n / (double)size) * (rank + 1));
     //The fraction of the image 'imgStartIndex' at which the process starts
     double start = rank * ((double)n / (double)size) - imgStartIndex;
     //The fraction of the image 'imgEndIndex' at which the process ends
@@ -117,8 +116,7 @@ animated_gif *load_pixels(char *filename int rank, int size)
     }
 
     /* Fill the width and height */
-    /* NOT CORRECT YET */
-    /* If distribution of the image not perfectly balanced, convention that the last portion of the image will take the 1 pixel more (=> ceil for the first, and floot for the second) */
+    /* If distribution of the image not perfectly balanced, convention that the last portion of the image will take the few pixels more */
     double tmpStart = start;
     for (i = 0; i < n_images; i++)
     {
@@ -128,8 +126,8 @@ animated_gif *load_pixels(char *filename int rank, int size)
         if(i < n_images-1) {
             double w = (1 - tmpStart) * actualWidth[i];
             double h = (1 - tmpStart) * actualHeight[i];
-            width[i] = floor(w) + computeRemainder(actualWidth[i], w, size, n, tmpStart, imgStartIndex+i);
-            height[i] = floor(h) + computeRemainder(actualHeight[i], h, size, n, tmpStart, imgStartIndex+i);
+            width[i] = floor(w) + computeRemainder(actualWidth[i], w, size, n, tmpStart, i2);
+            height[i] = floor(h) + computeRemainder(actualHeight[i], h, size, n, tmpStart, i2);
             tmpStart = 0;
         } else {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
@@ -256,7 +254,8 @@ int computeRemainder(int length, double newlength, int size, int n, double start
     int numProc = (n <= size) ? ceil((double)size / (double)n) : (startInImage == 0 ? 1 : 2);
     double tmp = length * ((double)n / (double)size);
     double remainder = tmp - (int)tmp;
-    double firstRemainder = (n <= size) ? (((double)n / (double)size) * numProc * imgIndex - imgIndex) : startInImage;
+    double tmpFirstRemainder = (n <= size) ? (((double)n / (double)size) * numProc * imgIndex - imgIndex) : startInImage; //ISSUE WHEN N <= SIZE
+    double firstRemainder = tmpFirstRemainder * length - (int)(tmpFirstRemainder * length);
     double lastRemainder = newlength - (int)newlength;
 
     return remainder * (numProc - 2) + firstRemainder + lastRemainder;
