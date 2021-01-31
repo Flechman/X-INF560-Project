@@ -22,18 +22,20 @@ typedef struct pixel
     int b ; /* Blue */
 } pixel ;
 
-/* Represent one GIF image (animated or not */
+/* Represent one GIF image (animated or not) */
 typedef struct animated_gif
 {
-    int n_images ; /* Number of images */
-    int * width ; /* Width of each image */
-    int * height ; /* Height of each image */
-    int * actualWidth ; /* Actual width of each image */
-    int * actualHeight ;  /* Actual height of each image */
-    pixel ** p ; /* Pixels of each image */
-    GifFileType * g ; /* Internal representation.
+    int n_images;      /* Number of images */
+    int *widthStart;   /* Index of start of each image width */
+    int *widthEnd;     /* Index of end of each image  width */
+    int *heightStart;  /* Index of start of each image height */
+    int *heightEnd;    /* Index of end of each image height */
+    int *actualWidth;  /* Actual width of each image */
+    int *actualHeight; /* Actual height of each image */
+    pixel **p;         /* Pixels of each image */
+    GifFileType *g;    /* Internal representation.
                          DO NOT MODIFY */
-} animated_gif ;
+} animated_gif;
 
 /*
  * Load a GIF image from a file and return a
@@ -46,10 +48,12 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     int error ;
     int n ;
     int n_images ;
-    int * width ;
-    int * height ;
-    int * actualWidth ;
-    int * actualHeight ;
+    int *widthStart;
+    int *widthEnd;
+    int *heightStart;
+    int *heightEnd;
+    int *actualWidth;
+    int *actualHeight;
     pixel ** p ;
     int i ;
     animated_gif * image ;
@@ -86,58 +90,81 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     n_images = imgEndIndex - imgStartIndex + 1;
 
     /* Allocate width and height */
-    width = (int *)malloc(n_images * sizeof(int));
-    if (width == NULL)
+    widthStart = (int *)malloc(n_images * sizeof(int));
+    if (widthStart == NULL)
     {
         fprintf(stderr, "Unable to allocate width of size %d\n",
                 n_images);
-        return 0;
+        return NULL;
     }
-    height = (int *)malloc(n_images * sizeof(int));
-    if (height == NULL)
+    widthEnd = (int *)malloc(n_images * sizeof(int));
+    if (widthEnd == NULL)
+    {
+        fprintf(stderr, "Unable to allocate width of size %d\n",
+                n_images);
+        return NULL;
+    }
+    heightStart = (int *)malloc(n_images * sizeof(int));
+    if (heightStart == NULL)
     {
         fprintf(stderr, "Unable to allocate height of size %d\n",
                 n_images);
-        return 0;
+        return NULL;
+    }
+    heightEnd = (int *)malloc(n_images * sizeof(int));
+    if (heightEnd == NULL)
+    {
+        fprintf(stderr, "Unable to allocate height of size %d\n",
+                n_images);
+        return NULL;
     }
     actualWidth = (int *)malloc(n_images * sizeof(int));
     if (actualWidth == NULL)
     {
         fprintf(stderr, "Unable to allocate width of size %d\n",
                 n_images);
-        return 0;
+        return NULL;
     }
     actualHeight = (int *)malloc(n_images * sizeof(int));
-    if (height == NULL)
+    if (actualHeight == NULL)
     {
         fprintf(stderr, "Unable to allocate height of size %d\n",
                 n_images);
-        return 0;
+        return NULL;
     }
 
     /* Fill the width and height */
-    /* If distribution of the image not perfectly balanced, convention that the last portion of the image will take the few pixels more */
     double tmpStart = start;
     for (i = 0; i < n_images; i++)
     {
-        int i2 = imgStartIndex+i;
-        actualWidth[i] = g->SavedImages[i2].ImageDesc.Width;
-        actualHeight[i] = g->SavedImages[i2].ImageDesc.Height;
-        if(i < n_images-1) {
-            double w = (1 - tmpStart) * actualWidth[i];
-            double h = (1 - tmpStart) * actualHeight[i];
-            width[i] = floor(w) + computeRemainder(actualWidth[i], w, size, n, tmpStart, i2);
-            height[i] = floor(h) + computeRemainder(actualHeight[i], h, size, n, tmpStart, i2);
+        int i2 = imgStartIndex + i;
+        actualWidth[i] = (i2 >= n) ? 0 : g->SavedImages[i2].ImageDesc.Width;
+        actualHeight[i] = (i2 >= n) ? 0 : g->SavedImages[i2].ImageDesc.Height;
+        if (i < n_images - 1)
+        {
+            double isw = tmpStart * actualWidth[i];
+            double ish = tmpStart * actualHeight[i];
+            widthStart[i] = round(isw);
+            heightStart[i] = round(ish);
+            widthEnd[i] = actualWidth[i];
+            heightEnd[i] = actualHeight[i];
             tmpStart = 0;
-        } else {
+        }
+        else
+        {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double w = (i >= n) ? 0 : (end - tmpStart) * actualWidth[i];
-            double h = (i >= n) ? 0 : (end - tmpStart) * actualHeight[i];
-            width[i] = floor(w);
-            height[i] = floor(h);
+            double isw = tmpStart * actualWidth[i];
+            double ish = tmpStart * actualHeight[i];
+            double iew = end * actualWidth[i];
+            double ieh = end * actualHeight[i];
+            widthStart[i] = round(isw);
+            heightStart[i] = round(ish);
+            widthEnd[i] = round(iew);
+            heightEnd[i] = round(ieh);
         }
         #if SOBELF_DEBUG
-            if(i < n) {
+            if (i2 < n)
+            {
                 printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
                     i2,
                     g->SavedImages[i2].ImageDesc.Left,
@@ -159,10 +186,10 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     }
 
     #if SOBELF_DEBUG
-    printf("Global color map: count:%d bpp:%d sort:%d\n",
-           g->SColorMap->ColorCount,
-           g->SColorMap->BitsPerPixel,
-           g->SColorMap->SortFlag);
+        printf("Global color map: count:%d bpp:%d sort:%d\n",
+            g->SColorMap->ColorCount,   
+            g->SColorMap->BitsPerPixel,
+            g->SColorMap->SortFlag);
     #endif
 
     /* Allocate the array of pixels to be returned */
@@ -175,54 +202,54 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     }
     for (i = 0; i < n_images; i++)
     {
-        p[i] = (pixel *)malloc(width[i] * height[i] * sizeof(pixel));
+        int width = widthEnd[i] - widthStart[i];
+        int height = heightEnd[i] - heightStart[i];
+        p[i] = (pixel *)malloc(width * height * sizeof(pixel));
         if (p[i] == NULL)
         {
             fprintf(stderr, "Unable to allocate %d-th array of %d pixels\n",
-                    i, width[i] * height[i]);
+                    i, width * height);
             return NULL;
         }
     }
 
     /* Fill pixels */
-    int startIndexWidth = floor(start * actualWidth[0]);
-    int startIndexHeight = floor(start * actualHeight[0]);
 
     /* For each image */
     for (i = 0; i < n_images; i++)
     {
-        int j;
-        int k;
         int i2 = imgStartIndex + i;
+        if(i2 < n) {
+            int j;
+            int k;
+            int width = widthEnd[i] - widthStart[i];
+            int height = heightEnd[i] - heightStart[i];
 
-        /* Get the local colormap if needed */
-        if (g->SavedImages[i2].ImageDesc.ColorMap)
-        {
-
-            /* TODO No support for local color map */
-            fprintf(stderr, "Error: application does not support local colormap\n");
-            return NULL;
-
-            colmap = g->SavedImages[i2].ImageDesc.ColorMap;
-        }
-
-        /* Traverse the image and fill pixels */
-        for (j = startIndexHeight; j < startIndexHeight+height[i]; ++j)
-        {
-            for (k = startIndexWidth; k < startIndexWidth+width[i]; ++k)
+            /* Get the local colormap if needed */
+            if (g->SavedImages[i2].ImageDesc.ColorMap)
             {
-                int c = g->SavedImages[i2].RasterBits[j * actualWidth[i] + k];
-                int j2 = j-startIndexHeight;
-                int k2 = k-startIndexWidth;
 
-                p[i][j2 * width[i] + k2].r = colmap->Colors[c].Red;
-                p[i][j2 * width[i] + k2].g = colmap->Colors[c].Green;
-                p[i][j2 * width[i] + k2].b = colmap->Colors[c].Blue;
+                /* TODO No support for local color map */
+                fprintf(stderr, "Error: application does not support local colormap\n");
+                return NULL;
+
+                colmap = g->SavedImages[i2].ImageDesc.ColorMap;
             }
-        }
-        if (i < n_images - 1) {
-            startIndexWidth = 0;
-            startIndexHeight = 0;
+
+            /* Traverse the image and fill pixels */
+            for (j = heightStart[i]; j < heightEnd[i]; ++j)
+            {
+                for (k = widthStart[i]; k < widthEnd[i]; ++k)
+                {
+                    int c = g->SavedImages[i2].RasterBits[j * actualWidth[i] + k];
+                    int j2 = j-heightStart[i];
+                    int k2 = k-widthStart[i];
+
+                    p[i][j2 * width + k2].r = colmap->Colors[c].Red;
+                    p[i][j2 * width + k2].g = colmap->Colors[c].Green;
+                    p[i][j2 * width + k2].b = colmap->Colors[c].Blue;
+                }
+            }
         }
     }
 
@@ -236,16 +263,18 @@ animated_gif *load_pixels(char *filename, int rank, int size)
 
     /* Fill image fields */
     image->n_images = n_images ;
-    image->width = width ;
-    image->height = height ;
+    image->widthStart = widthStart ;
+    image->widthEnd = widthEnd ;
+    image->heightStart = heightStart ;
+    image->heightEnd = heightEnd ;
     image->actualWidth = actualWidth ;
     image->actualHeight = actualHeight ;
     image->p = p ;
     image->g = g ;
 
     #if SOBELF_DEBUG
-        printf( "-> GIF w/ %d image(s) with first image of size %d x %d\n",
-            image->n_images, image->width[0], image->height[0] ) ;
+    printf("-> rank %d w/ %d image(s) with first (sub)image of size %d x %d\n", rank,
+           image->n_images, image->widthEnd[0] - image->widthStart[0], image->heightEnd[0] - image->heightStart[0]);
     #endif
 
     return image ;

@@ -23,14 +23,12 @@ typedef struct animated_gif
     int *widthEnd;     /* Index of end of each image  width */
     int *heightStart;  /* Index of start of each image height */
     int *heightEnd;    /* Index of end of each image height */
-    int *height;       /* Height of each image */
     int *actualWidth;  /* Actual width of each image */
     int *actualHeight; /* Actual height of each image */
     pixel **p;         /* Pixels of each image */
 } animated_gif;
 
 animated_gif *load_pixels(animated_gif *original, int rank, int size);
-int computeRemainder(int length, double newlength, int size, int n, int rank, double startInImage, int imgIndex);
 animated_gif *createImage(int n_images, int width, int height);
 
 int main(void)
@@ -38,10 +36,10 @@ int main(void)
     int i;
 
     /* Image parameters ; CHANGE HERE PARAMETERS */
-    int n_images = 4;
-    int width = 25;
-    int height = 25;
-    int size = 7; //Number of processes
+    int n_images = 3;
+    int width = 100;
+    int height = 100;
+    int size = 2; //Number of processes
 
     animated_gif *image = createImage(n_images, width, height);
     printf("+========================+\n");
@@ -157,8 +155,8 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
     for (i = 0; i < n_images; i++)
     {
         int i2 = imgStartIndex + i;
-        actualWidth[i] = original->actualWidth[i2];
-        actualHeight[i] = original->actualHeight[i2];
+        actualWidth[i] = (i2 >= n) ? 0 : original->actualWidth[i2];
+        actualHeight[i] = (i2 >= n) ? 0 : original->actualHeight[i2];
         printf("  Image #%d for Process %d:\n", i, rank);
         fflush(stdout);
         if (i < n)
@@ -182,20 +180,14 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
         else
         {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double isw = (i >= n) ? 0 : tmpStart * actualWidth[i];
-            double ish = (i >= n) ? 0 : tmpStart * actualHeight[i];
-            double iew = (i >= n) ? 0 : end * actualWidth[i];
-            double ieh = (i >= n) ? 0 : end * actualHeight[i];
+            double isw = tmpStart * actualWidth[i];
+            double ish = tmpStart * actualHeight[i];
+            double iew = end * actualWidth[i];
+            double ieh = end * actualHeight[i];
             widthStart[i] = round(isw);
             heightStart[i] = round(ish);
             widthEnd[i] = round(iew);
             heightEnd[i] = round(ieh);
-#if SOBELF_DEBUG
-            printf("Image %d: w:%d h:%d\n",
-                   i2,
-                   original->actualWidth[i2],
-                   original->actualHeight[i2]);
-#endif
             printf("    - Width = %d | Height = %d\n", widthEnd[i] - widthStart[i], heightEnd[i] - heightStart[i]);
         }
         fflush(stdout);
@@ -276,23 +268,6 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
     return image;
 }
 
-int computeRemainder(int length, double newlength, int size, int n, int rank, double startInImage, int imgIndex)
-{
-    printf("    Remainder!\n");
-    int numProc = (n <= size) ? ceil((double)size / (double)n) : (startInImage == 0 ? 1 : 2);
-    double tmp = length * ((double)n / (double)size);
-    double remainder = tmp - (int)tmp;
-    double endOfFirst = (rank - numProc + 2) * ((double)n / (double)size) - imgIndex;
-    double tmpFirstRemainder = (n <= size) ? endOfFirst : startInImage;
-    double firstRemainder = tmpFirstRemainder * length - (int)(tmpFirstRemainder * length);
-    double lastRemainder = newlength - (int)newlength;
-    printf("        - firstRemainder = %.5f\n", firstRemainder);
-    printf("        - remainder = %.5f\n", remainder);
-    printf("        - remainder*(numproc-2) = %.5f\n", remainder * (numProc - 2));
-    printf("        - lastRemainder = %.5f\n", lastRemainder);
-    fflush(stdout);
-    return round(remainder * (numProc - 2) + firstRemainder + lastRemainder);
-}
 
 animated_gif *createImage(int n_images, int width, int height)
 {
