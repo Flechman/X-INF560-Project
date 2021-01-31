@@ -26,12 +26,12 @@ typedef struct pixel
 typedef struct animated_gif
 {
     int n_images;      /* Number of images */
-    int *widthStart;   /* Index of start of each image width */
-    int *widthEnd;     /* Index of end of each image  width */
-    int *heightStart;  /* Index of start of each image height */
-    int *heightEnd;    /* Index of end of each image height */
-    int *actualWidth;  /* Actual width of each image */
-    int *actualHeight; /* Actual height of each image */
+    int *widthStart;   /* Index of start of each image (for width) */
+    int *widthEnd;     /* Index of end of each image  (for width) */
+    int *heightStart;  /* Index of start of each image (for height) */
+    int *heightEnd;    /* Index of end of each image (for height) */
+    int *actualWidth;  /* Actual width of each image (INITIAL width before parallelism) */
+    int *actualHeight; /* Actual height of each image (INITIAL width before parallelism) */
     pixel **p;         /* Pixels of each image */
     GifFileType *g;    /* Internal representation.
                          DO NOT MODIFY */
@@ -78,18 +78,18 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     /* Grab the number of images */
     n = g->ImageCount ;
 
-    //The index of the image at which this process starts
+    //The index of the image at which this process starts to work on
     int imgStartIndex = (int)(((double)n/(double)size) * rank);
-    //The index of the image at which this process ends
+    //The index of the image at which this process ends to work on
     int imgEndIndex = (int)(((double)n / (double)size) * (rank + 1));
-    //The fraction of the image 'imgStartIndex' at which the process starts
+    //The fraction of the image 'imgStartIndex' at which the process starts (invariant : start of 'rank' is end of 'rank-1')
     double start = rank * ((double)n / (double)size) - imgStartIndex;
-    //The fraction of the image 'imgEndIndex' at which the process ends
+    //The fraction of the image 'imgEndIndex' at which the process ends (invariant : end of 'rank' is the start of 'rank+1')
     double end = (rank + 1) * ((double)n / (double)size) - imgEndIndex;
     //Number of images on which this process works on (contiguous images)
     n_images = imgEndIndex - imgStartIndex + 1;
 
-    /* Allocate width and height */
+    /* Allocate widthStart, widthEnd, heightStart, heightEnd, actualWidth, actualHeight */
     widthStart = (int *)malloc(n_images * sizeof(int));
     if (widthStart == NULL)
     {
@@ -134,6 +134,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     }
 
     /* Fill the width and height */
+    //Temp fraction of an image, updated at each iteration to dermine new start index (always 0 when i>0)
     double tmpStart = start;
     for (i = 0; i < n_images; i++)
     {
