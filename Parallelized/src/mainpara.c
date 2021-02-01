@@ -687,7 +687,7 @@ apply_gray_filter( animated_gif * image, int rank, int size)
 #define CONV(l,c,nb_c) \
     (l)*(nb_c)+(c)
 
-void apply_gray_line( animated_gif * image ) 
+void apply_gray_line( animated_gif * image, int rank, int size) 
 {
     int i, j, k ;
     pixel ** p ;
@@ -696,13 +696,14 @@ void apply_gray_line( animated_gif * image )
 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
+        int width = image->widthEnd[i] - image->widthStart[i];
         for ( j = 0 ; j < 10 ; j++ )
         {
-            for ( k = image->width[i]/2 ; k < image->width[i] ; k++ )
+            for ( k = width/2 ; k < width ; k++ )
             {
-            p[i][CONV(j,k,image->width[i])].r = 0 ;
-            p[i][CONV(j,k,image->width[i])].g = 0 ;
-            p[i][CONV(j,k,image->width[i])].b = 0 ;
+            p[i][CONV(j,k,width)].r = 0 ;
+            p[i][CONV(j,k,width)].g = 0 ;
+            p[i][CONV(j,k,width)].b = 0 ;
             }
         }
     }
