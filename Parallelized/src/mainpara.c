@@ -281,18 +281,6 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     return image ;
 }
 
-int computeRemainder(int length, double newlength, int size, int n, double startInImage, int imgIndex)
-{
-    int numProc = (n <= size) ? ceil((double)size / (double)n) : (startInImage == 0 ? 1 : 2);
-    double tmp = length * ((double)n / (double)size);
-    double remainder = tmp - (int)tmp;
-    double tmpFirstRemainder = (n <= size) ? (((double)n / (double)size) * numProc * imgIndex - imgIndex) : startInImage; //ISSUE WHEN N <= SIZE
-    double firstRemainder = tmpFirstRemainder * length - (int)(tmpFirstRemainder * length);
-    double lastRemainder = newlength - (int)newlength;
-
-    return remainder * (numProc - 2) + firstRemainder + lastRemainder;
-}
-
 int output_modified_read_gif( char * filename, GifFileType * g ) 
 {
     GifFileType * g2 ;
@@ -670,7 +658,7 @@ int store_pixels( char * filename, animated_gif * image )
 }
 
 void
-apply_gray_filter( animated_gif * image )
+apply_gray_filter( animated_gif * image, int rank, int size)
 {
     int i, j ;
     pixel ** p ;
@@ -679,7 +667,9 @@ apply_gray_filter( animated_gif * image )
 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        for ( j = 0 ; j < image->width[i] * image->height[i] ; j++ )
+        int width = image->widthEnd[i] - image->widthStart[i];
+        int height = image->heightEnd[i] - image->heightStart[i];
+        for ( j = 0 ; j < width * height ; j++ )
         {
             int moy ;
 
@@ -996,7 +986,7 @@ int main( int argc, char ** argv )
     gettimeofday(&t1, NULL);
 
     /* Convert the pixels into grayscale */
-    apply_gray_filter( image ) ;
+    apply_gray_filter( image, rank, size) ;
 
     /* Apply blur filter with convergence value */
     apply_blur_filter( image, 5, 20 ) ;
