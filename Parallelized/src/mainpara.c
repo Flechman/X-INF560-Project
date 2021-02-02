@@ -643,7 +643,7 @@ apply_gray_filter( animated_gif * image, int rank, int size)
 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        int width = image->widthEnd[i] - image->widthStart[i];
+        int width = image->actualWidth[i];
         int height = image->heightEnd[i] - image->heightStart[i];
         for ( j = 0 ; j < width * height ; j++ )
         {
@@ -669,22 +669,17 @@ void apply_gray_line( animated_gif * image, int rank, int size)
 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        if (image->widthEnd[i] > image->actualWidth[i]/2)
-        {
-            int width = image->widthEnd[i] - image->widthStart[i];
-            int start = (image->widthStart[i] <= image->actualWidth[i]/2) ? image->actualWidth[i]/2 : image->widthStart[i];
-            if(image->heightStart[i] < 10) {
-                int end = (image->heightEnd[i] < 10) ? image->heightEnd[i] : 10;
-                for (j = image->heightStart[i]; j < end; j++)
+        if(image->heightStart[i] < 10) {
+            int end = (image->heightEnd[i] <= 10) ? image->heightEnd[i] : 10;
+            for (j = image->heightStart[i]; j < end; j++)
+            {
+                int width = image->actualWidth[i];
+                for (k = width/2; k < width; k++)
                 {
-                    for (k = start / 2; k < image->widthEnd[i]; k++)
-                    {
-                        int k2 = k-image->widthStart[i];
-                        int j2 = j-image->heightStart[i];
-                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].r = 0;
-                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].g = 0;
-                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].b = 0;
-                    }
+                    int j2 = j-image->heightStart[i];
+                    p[i][TWO_D_TO_ONE_D(j2, k, width)].r = 0;
+                    p[i][TWO_D_TO_ONE_D(j2, k, width)].g = 0;
+                    p[i][TWO_D_TO_ONE_D(j2, k, width)].b = 0;
                 }
             }
         }
