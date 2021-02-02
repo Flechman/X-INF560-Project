@@ -761,7 +761,7 @@ apply_blur_filter( animated_gif * image, int size, int threshold, int rank, int 
                 }
             }
 
-            /* Apply blur on top part of image (10%) */
+            /* Apply blur on top part of image (10%) DEPENDS ON OTHER PARTS OF THE IMAGE */
             for(j=size; j<height/10-size; j++)
             {
                 for(k=size; k<width-size; k++)
@@ -888,8 +888,8 @@ apply_sobel_filter( animated_gif * image )
             for(k=1; k<width-1; k++)
             {
                 int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
-                int pixel_blue_so, pixel_blue_s, pixel_blue_se;
                 int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+                int pixel_blue_so, pixel_blue_s, pixel_blue_se;
 
                 float deltaX_blue ;
                 float deltaY_blue ;
