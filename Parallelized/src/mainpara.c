@@ -14,6 +14,10 @@
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 
+/* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
+#define TWO_D_TO_ONE_D(l, c, nb_c) \
+    ((l) * (nb_c) + (c))
+
 /* Represent one pixel from the image */
 typedef struct pixel
 {
@@ -242,13 +246,13 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             {
                 for (k = widthStart[i]; k < widthEnd[i]; ++k)
                 {
-                    int c = g->SavedImages[i2].RasterBits[j * actualWidth[i] + k];
+                    int c = g->SavedImages[i2].RasterBits[TWO_D_TO_ONE_D(j, k, actualWidth[i])];
                     int j2 = j-heightStart[i];
                     int k2 = k-widthStart[i];
 
-                    p[i][j2 * width + k2].r = colmap->Colors[c].Red;
-                    p[i][j2 * width + k2].g = colmap->Colors[c].Green;
-                    p[i][j2 * width + k2].b = colmap->Colors[c].Blue;
+                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].r = colmap->Colors[c].Red;
+                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].g = colmap->Colors[c].Green;
+                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].b = colmap->Colors[c].Blue;
                 }
             }
         }
@@ -684,9 +688,6 @@ apply_gray_filter( animated_gif * image, int rank, int size)
     }
 }
 
-#define CONV(l,c,nb_c) \
-    (l)*(nb_c)+(c)
-
 void apply_gray_line( animated_gif * image, int rank, int size) 
 {
     int i, j, k ;
@@ -696,21 +697,30 @@ void apply_gray_line( animated_gif * image, int rank, int size)
 
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        int width = image->widthEnd[i] - image->widthStart[i];
-        for ( j = 0 ; j < 10 ; j++ )
+        if (image->widthEnd[i] > image->actualWidth[i]/2)
         {
-            for ( k = width/2 ; k < width ; k++ )
-            {
-            p[i][CONV(j,k,width)].r = 0 ;
-            p[i][CONV(j,k,width)].g = 0 ;
-            p[i][CONV(j,k,width)].b = 0 ;
+            int width = image->widthEnd[i] - image->widthStart[i];
+            int start = (image->widthStart[i] <= image->actualWidth[i]/2) ? image->actualWidth[i]/2 : image->widthStart[i];
+            if(image->heightStart[i] < 10) {
+                int end = (image->heightEnd[i] < 10) ? image->heightEnd[i] : 10;
+                for (j = image->heightStart[i]; j < end; j++)
+                {
+                    for (k = start / 2; k < image->widthEnd[i]; k++)
+                    {
+                        int k2 = k-image->widthStart[i];
+                        int j2 = j-image->heightStart[i];
+                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].r = 0;
+                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].g = 0;
+                        p[i][TWO_D_TO_ONE_D(j2, k2, width)].b = 0;
+                    }
+                }
             }
         }
     }
 }
 
 void
-apply_blur_filter( animated_gif * image, int size, int threshold )
+apply_blur_filter( animated_gif * image, int size, int threshold, int rank, int nbProc )
 {
     int i, j, k ;
     int width, height ;
@@ -728,8 +738,8 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
     for ( i = 0 ; i < image->n_images ; i++ )
     {
         n_iter = 0 ;
-        width = image->width[i] ;
-        height = image->height[i] ;
+        width = image->widthEnd[i] - image->widthStart[i];
+        height = image->heightEnd[i] - image->heightStart[i];
 
         /* Allocate array of new pixels */
         new = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
@@ -741,16 +751,15 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
             end = 1 ;
             n_iter++ ;
 
-
-	for(j=0; j<height-1; j++)
-	{
-		for(k=0; k<width-1; k++)
-		{
-			new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ;
-			new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ;
-			new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ;
-		}
-	}
+            for(j=0; j<height-1; j++)
+            {
+                for(k=0; k<width-1; k++)
+                {
+                    new[TWO_D_TO_ONE_D(j,k,width)].r = p[i][TWO_D_TO_ONE_D(j,k,width)].r ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].g = p[i][TWO_D_TO_ONE_D(j,k,width)].g ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].b = p[i][TWO_D_TO_ONE_D(j,k,width)].b ;
+                }
+            }
 
             /* Apply blur on top part of image (10%) */
             for(j=size; j<height/10-size; j++)
@@ -766,15 +775,15 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
                     {
                         for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
                         {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
+                            t_r += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].r ;
+                            t_g += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].g ;
+                            t_b += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].b ;
                         }
                     }
 
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
                 }
             }
 
@@ -783,9 +792,9 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
             {
                 for(k=size; k<width-size; k++)
                 {
-                    new[CONV(j,k,width)].r = p[i][CONV(j,k,width)].r ; 
-                    new[CONV(j,k,width)].g = p[i][CONV(j,k,width)].g ; 
-                    new[CONV(j,k,width)].b = p[i][CONV(j,k,width)].b ; 
+                    new[TWO_D_TO_ONE_D(j,k,width)].r = p[i][TWO_D_TO_ONE_D(j,k,width)].r ; 
+                    new[TWO_D_TO_ONE_D(j,k,width)].g = p[i][TWO_D_TO_ONE_D(j,k,width)].g ; 
+                    new[TWO_D_TO_ONE_D(j,k,width)].b = p[i][TWO_D_TO_ONE_D(j,k,width)].b ; 
                 }
             }
 
@@ -803,15 +812,15 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
                     {
                         for ( stencil_k = -size ; stencil_k <= size ; stencil_k++ )
                         {
-                            t_r += p[i][CONV(j+stencil_j,k+stencil_k,width)].r ;
-                            t_g += p[i][CONV(j+stencil_j,k+stencil_k,width)].g ;
-                            t_b += p[i][CONV(j+stencil_j,k+stencil_k,width)].b ;
+                            t_r += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].r ;
+                            t_g += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].g ;
+                            t_b += p[i][TWO_D_TO_ONE_D(j+stencil_j,k+stencil_k,width)].b ;
                         }
                     }
 
-                    new[CONV(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
-                    new[CONV(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].r = t_r / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].g = t_g / ( (2*size+1)*(2*size+1) ) ;
+                    new[TWO_D_TO_ONE_D(j,k,width)].b = t_b / ( (2*size+1)*(2*size+1) ) ;
                 }
             }
 
@@ -824,31 +833,31 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
                     float diff_g ;
                     float diff_b ;
 
-                    diff_r = (new[CONV(j  ,k  ,width)].r - p[i][CONV(j  ,k  ,width)].r) ;
-                    diff_g = (new[CONV(j  ,k  ,width)].g - p[i][CONV(j  ,k  ,width)].g) ;
-                    diff_b = (new[CONV(j  ,k  ,width)].b - p[i][CONV(j  ,k  ,width)].b) ;
+                    diff_r = (new[TWO_D_TO_ONE_D(j  ,k  ,width)].r - p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].r) ;
+                    diff_g = (new[TWO_D_TO_ONE_D(j  ,k  ,width)].g - p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].g) ;
+                    diff_b = (new[TWO_D_TO_ONE_D(j  ,k  ,width)].b - p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b) ;
 
                     if ( diff_r > threshold || -diff_r > threshold 
                             ||
-                             diff_g > threshold || -diff_g > threshold
-                             ||
-                              diff_b > threshold || -diff_b > threshold
-                       ) {
+                            diff_g > threshold || -diff_g > threshold
+                            ||
+                            diff_b > threshold || -diff_b > threshold
+                    ) {
                         end = 0 ;
                     }
 
-                    p[i][CONV(j  ,k  ,width)].r = new[CONV(j  ,k  ,width)].r ;
-                    p[i][CONV(j  ,k  ,width)].g = new[CONV(j  ,k  ,width)].g ;
-                    p[i][CONV(j  ,k  ,width)].b = new[CONV(j  ,k  ,width)].b ;
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].r = new[TWO_D_TO_ONE_D(j  ,k  ,width)].r ;
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].g = new[TWO_D_TO_ONE_D(j  ,k  ,width)].g ;
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b = new[TWO_D_TO_ONE_D(j  ,k  ,width)].b ;
                 }
             }
 
         }
         while ( threshold > 0 && !end ) ;
 
-#if SOBELF_DEBUG
-	printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
-#endif
+        #if SOBELF_DEBUG
+            printf( "BLUR: number of iterations for image %d\n", n_iter ) ;
+        #endif
 
         free (new) ;
     }
@@ -886,15 +895,15 @@ apply_sobel_filter( animated_gif * image )
                 float deltaY_blue ;
                 float val_blue;
 
-                pixel_blue_no = p[i][CONV(j-1,k-1,width)].b ;
-                pixel_blue_n  = p[i][CONV(j-1,k  ,width)].b ;
-                pixel_blue_ne = p[i][CONV(j-1,k+1,width)].b ;
-                pixel_blue_so = p[i][CONV(j+1,k-1,width)].b ;
-                pixel_blue_s  = p[i][CONV(j+1,k  ,width)].b ;
-                pixel_blue_se = p[i][CONV(j+1,k+1,width)].b ;
-                pixel_blue_o  = p[i][CONV(j  ,k-1,width)].b ;
-                pixel_blue    = p[i][CONV(j  ,k  ,width)].b ;
-                pixel_blue_e  = p[i][CONV(j  ,k+1,width)].b ;
+                pixel_blue_no = p[i][TWO_D_TO_ONE_D(j-1,k-1,width)].b ;
+                pixel_blue_n  = p[i][TWO_D_TO_ONE_D(j-1,k  ,width)].b ;
+                pixel_blue_ne = p[i][TWO_D_TO_ONE_D(j-1,k+1,width)].b ;
+                pixel_blue_so = p[i][TWO_D_TO_ONE_D(j+1,k-1,width)].b ;
+                pixel_blue_s  = p[i][TWO_D_TO_ONE_D(j+1,k  ,width)].b ;
+                pixel_blue_se = p[i][TWO_D_TO_ONE_D(j+1,k+1,width)].b ;
+                pixel_blue_o  = p[i][TWO_D_TO_ONE_D(j  ,k-1,width)].b ;
+                pixel_blue    = p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b ;
+                pixel_blue_e  = p[i][TWO_D_TO_ONE_D(j  ,k+1,width)].b ;
 
                 deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
 
@@ -905,14 +914,14 @@ apply_sobel_filter( animated_gif * image )
 
                 if ( val_blue > 50 ) 
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 255 ;
-                    sobel[CONV(j  ,k  ,width)].g = 255 ;
-                    sobel[CONV(j  ,k  ,width)].b = 255 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r = 255 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g = 255 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b = 255 ;
                 } else
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 0 ;
-                    sobel[CONV(j  ,k  ,width)].g = 0 ;
-                    sobel[CONV(j  ,k  ,width)].b = 0 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r = 0 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g = 0 ;
+                    sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b = 0 ;
                 }
             }
         }
@@ -921,9 +930,9 @@ apply_sobel_filter( animated_gif * image )
         {
             for(k=1; k<width-1; k++)
             {
-                p[i][CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
-                p[i][CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
-                p[i][CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+                p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].r = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r ;
+                p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].g = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g ;
+                p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b ;
             }
         }
 
@@ -990,7 +999,7 @@ int main( int argc, char ** argv )
     apply_gray_filter( image, rank, size) ;
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter( image, 5, 20 ) ;
+    apply_blur_filter( image, 5, 20, rank, size) ;
 
     /* Apply sobel filter on pixels */
     apply_sobel_filter( image ) ;
