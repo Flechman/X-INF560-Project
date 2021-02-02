@@ -30,8 +30,6 @@ typedef struct pixel
 typedef struct animated_gif
 {
     int n_images;      /* Number of images */
-    int *widthStart;   /* Index of start of each image (for width) */
-    int *widthEnd;     /* Index of end of each image  (for width) */
     int *heightStart;  /* Index of start of each image (for height) */
     int *heightEnd;    /* Index of end of each image (for height) */
     int *actualWidth;  /* Actual width of each image (INITIAL width before parallelism) */
@@ -52,8 +50,6 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     int error ;
     int n ;
     int n_images ;
-    int *widthStart;
-    int *widthEnd;
     int *heightStart;
     int *heightEnd;
     int *actualWidth;
@@ -93,21 +89,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     //Number of images on which this process works on (contiguous images)
     n_images = imgEndIndex - imgStartIndex + 1;
 
-    /* Allocate widthStart, widthEnd, heightStart, heightEnd, actualWidth, actualHeight */
-    widthStart = (int *)malloc(n_images * sizeof(int));
-    if (widthStart == NULL)
-    {
-        fprintf(stderr, "Unable to allocate width of size %d\n",
-                n_images);
-        return NULL;
-    }
-    widthEnd = (int *)malloc(n_images * sizeof(int));
-    if (widthEnd == NULL)
-    {
-        fprintf(stderr, "Unable to allocate width of size %d\n",
-                n_images);
-        return NULL;
-    }
+    /* Allocate heightStart, heightEnd, actualWidth, actualHeight */
     heightStart = (int *)malloc(n_images * sizeof(int));
     if (heightStart == NULL)
     {
@@ -138,8 +120,10 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     }
 
     /* Fill the width and height */
+
     //Temp fraction of an image, updated at each iteration to dermine new start index (always 0 when i>0)
     double tmpStart = start;
+
     for (i = 0; i < n_images; i++)
     {
         int i2 = imgStartIndex + i;
@@ -147,24 +131,17 @@ animated_gif *load_pixels(char *filename, int rank, int size)
         actualHeight[i] = (i2 >= n) ? 0 : g->SavedImages[i2].ImageDesc.Height;
         if (i < n_images - 1)
         {
-            double isw = tmpStart * actualWidth[i];
             double ish = tmpStart * actualHeight[i];
-            widthStart[i] = round(isw);
             heightStart[i] = round(ish);
-            widthEnd[i] = actualWidth[i];
             heightEnd[i] = actualHeight[i];
             tmpStart = 0;
         }
         else
         {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double isw = tmpStart * actualWidth[i];
             double ish = tmpStart * actualHeight[i];
-            double iew = end * actualWidth[i];
             double ieh = end * actualHeight[i];
-            widthStart[i] = round(isw);
             heightStart[i] = round(ish);
-            widthEnd[i] = round(iew);
             heightEnd[i] = round(ieh);
         }
         #if SOBELF_DEBUG
@@ -207,7 +184,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
     }
     for (i = 0; i < n_images; i++)
     {
-        int width = widthEnd[i] - widthStart[i];
+        int width = actualWidth[i];
         int height = heightEnd[i] - heightStart[i];
         p[i] = (pixel *)malloc(width * height * sizeof(pixel));
         if (p[i] == NULL)
@@ -227,8 +204,6 @@ animated_gif *load_pixels(char *filename, int rank, int size)
         if(i2 < n) {
             int j;
             int k;
-            int width = widthEnd[i] - widthStart[i];
-            int height = heightEnd[i] - heightStart[i];
 
             /* Get the local colormap if needed */
             if (g->SavedImages[i2].ImageDesc.ColorMap)
@@ -244,15 +219,14 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             /* Traverse the image and fill pixels */
             for (j = heightStart[i]; j < heightEnd[i]; ++j)
             {
-                for (k = widthStart[i]; k < widthEnd[i]; ++k)
+                for (k = 0; k < actualWidth[i]; ++k)
                 {
                     int c = g->SavedImages[i2].RasterBits[TWO_D_TO_ONE_D(j, k, actualWidth[i])];
                     int j2 = j-heightStart[i];
-                    int k2 = k-widthStart[i];
 
-                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].r = colmap->Colors[c].Red;
-                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].g = colmap->Colors[c].Green;
-                    p[i][TWO_D_TO_ONE_D(j2, k2, width)].b = colmap->Colors[c].Blue;
+                    p[i][TWO_D_TO_ONE_D(j2, k, actualWidth[i])].r = colmap->Colors[c].Red;
+                    p[i][TWO_D_TO_ONE_D(j2, k, actualWidth[i])].g = colmap->Colors[c].Green;
+                    p[i][TWO_D_TO_ONE_D(j2, k, actualWidth[i])].b = colmap->Colors[c].Blue;
                 }
             }
         }
@@ -268,8 +242,6 @@ animated_gif *load_pixels(char *filename, int rank, int size)
 
     /* Fill image fields */
     image->n_images = n_images ;
-    image->widthStart = widthStart ;
-    image->widthEnd = widthEnd ;
     image->heightStart = heightStart ;
     image->heightEnd = heightEnd ;
     image->actualWidth = actualWidth ;
@@ -750,14 +722,18 @@ apply_blur_filter( animated_gif * image, int size, int threshold, int rank, int 
         {
             end = 1 ;
             n_iter++ ;
-
-            for(j=0; j<height-1; j++)
+            
+            int heightEnd = (image->heightEnd[i] >= (image->actualHeight[i]-1)) ? image->actualHeight[i]-1 : image->heightEnd[i];
+            int widthEnd = (image->widthEnd[i] >= (image->actualWidth[i] - 1)) ? image->actualWidth[i] - 1 : image->widthEnd[i];
+            for(j=image->heightStart[i]; j<heightEnd; j++)
             {
-                for(k=0; k<width-1; k++)
+                for(k=image->widthStart[i]; k<widthEnd; k++)
                 {
-                    new[TWO_D_TO_ONE_D(j,k,width)].r = p[i][TWO_D_TO_ONE_D(j,k,width)].r ;
-                    new[TWO_D_TO_ONE_D(j,k,width)].g = p[i][TWO_D_TO_ONE_D(j,k,width)].g ;
-                    new[TWO_D_TO_ONE_D(j,k,width)].b = p[i][TWO_D_TO_ONE_D(j,k,width)].b ;
+                    int j2 = j - image->heightStart[i];
+                    int k2 = k - image->widthStart[i];
+                    new[TWO_D_TO_ONE_D(j2,k2,width)].r = p[i][TWO_D_TO_ONE_D(j2,k2,width)].r ;
+                    new[TWO_D_TO_ONE_D(j2,k2,width)].g = p[i][TWO_D_TO_ONE_D(j2,k2,width)].g ;
+                    new[TWO_D_TO_ONE_D(j2,k2,width)].b = p[i][TWO_D_TO_ONE_D(j2,k2,width)].b ;
                 }
             }
 
