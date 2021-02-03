@@ -19,8 +19,6 @@ typedef struct pixel
 typedef struct animated_gif
 {
     int n_images;      /* Number of images */
-    int *widthStart;   /* Index of start of each image width */
-    int *widthEnd;     /* Index of end of each image  width */
     int *heightStart;  /* Index of start of each image height */
     int *heightEnd;    /* Index of end of each image height */
     int *actualWidth;  /* Actual width of each image */
@@ -75,8 +73,6 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
     int error;
     int n;
     int n_images;
-    int *widthStart;
-    int *widthEnd;
     int *heightStart;
     int *heightEnd;
     int *actualWidth;
@@ -106,20 +102,6 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
     fflush(stdout);
 
     /* Allocate width and height */
-    widthStart = (int *)malloc(n_images * sizeof(int));
-    if (widthStart == NULL)
-    {
-        fprintf(stderr, "Unable to allocate width of size %d\n",
-                n_images);
-        return NULL;
-    }
-    widthEnd = (int *)malloc(n_images * sizeof(int));
-    if (widthEnd == NULL)
-    {
-        fprintf(stderr, "Unable to allocate width of size %d\n",
-                n_images);
-        return NULL;
-    }
     heightStart = (int *)malloc(n_images * sizeof(int));
     if (heightStart == NULL)
     {
@@ -165,30 +147,23 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
         }
         if (i < n_images - 1)
         {
-            double isw = tmpStart * actualWidth[i];
             double ish = tmpStart * actualHeight[i];
             //int rw = computeRemainder(actualWidth[i], w, size, n, rank, tmpStart, i2);
             //int rh = computeRemainder(actualHeight[i], h, size, n, rank, tmpStart, i2);
-            widthStart[i] = round(isw);
             heightStart[i] = round(ish);
-            widthEnd[i] = actualWidth[i];
             heightEnd[i] = actualHeight[i];
             tmpStart = 0;
-            printf("    - Width = %d | Height = %d\n", widthEnd[i] - widthStart[i], heightEnd[i] - heightStart[i]);
+            printf("    - Width = %d | Height = %d\n", actualWidth[i], heightEnd[i] - heightStart[i]);
             //printf("    - RemainderWidth = %d | RemainderHeight = %d\n", rw, rh);
         }
         else
         {
             //If end = 0 (possible from its computaiton) then w=0, h=0 and we have an empty image, which is not bothering because further access to that image will do nothing
-            double isw = tmpStart * actualWidth[i];
             double ish = tmpStart * actualHeight[i];
-            double iew = end * actualWidth[i];
             double ieh = end * actualHeight[i];
-            widthStart[i] = round(isw);
             heightStart[i] = round(ish);
-            widthEnd[i] = round(iew);
             heightEnd[i] = round(ieh);
-            printf("    - Width = %d | Height = %d\n", widthEnd[i] - widthStart[i], heightEnd[i] - heightStart[i]);
+            printf("    - Width = %d | Height = %d\n", actualWidth[i], heightEnd[i] - heightStart[i]);
         }
         fflush(stdout);
     }
@@ -203,7 +178,7 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
     }
     for (i = 0; i < n_images; i++)
     {
-        int width = widthEnd[i] - widthStart[i];
+        int width = actualWidth[i];
         int height = heightEnd[i] - heightStart[i];
         p[i] = (pixel *)malloc(width * height * sizeof(pixel));
         if (p[i] == NULL)
@@ -222,22 +197,21 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
         int j;
         int k;
         int i2 = imgStartIndex + i;
-        int width = widthEnd[i] - widthStart[i];
+        int width = actualWidth[i];
         int height = heightEnd[i] - heightStart[i];
-        printf(" Pixel part %d: startIndexWidth = %d | startIndexHeight = %d\n", i, widthStart[i], heightStart[i]);
+        printf(" Pixel part %d: startIndexHeight = %d\n", i, heightStart[i]);
         fflush(stdout);
 
         /* Traverse the image and fill pixels */
         for (j = heightStart[i]; j < heightEnd[i]; ++j)
         {
-            for (k = widthStart[i]; k < widthEnd[i]; ++k)
+            for (k = 0; k < width; ++k)
             {
                 int j2 = j - heightStart[i];
-                int k2 = k - widthStart[i];
 
-                p[i][j2 * width + k2].r = original->p[i2][j * actualWidth[i] + k].r;
-                p[i][j2 * width + k2].g = original->p[i2][j * actualWidth[i] + k].g;
-                p[i][j2 * width + k2].b = original->p[i2][j * actualWidth[i] + k].b;
+                p[i][j2 * width + k].r = original->p[i2][j * actualWidth[i] + k].r;
+                p[i][j2 * width + k].g = original->p[i2][j * actualWidth[i] + k].g;
+                p[i][j2 * width + k].b = original->p[i2][j * actualWidth[i] + k].b;
             }
         }
     }
@@ -252,18 +226,11 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
 
     /* Fill image fields */
     image->n_images = n_images;
-    image->widthStart = widthStart;
     image->heightStart = heightStart;
-    image->widthEnd = widthEnd;
     image->heightEnd = heightEnd;
     image->actualWidth = actualWidth;
     image->actualHeight = actualHeight;
     image->p = p;
-
-#if SOBELF_DEBUG
-    printf("-> GIF w/ %d image(s) with first image of size %d x %d\n",
-           image->n_images, image->width[0], image->height[0]);
-#endif
 
     return image;
 }
@@ -274,27 +241,11 @@ animated_gif *createImage(int n_images, int width, int height)
     int i;
 
     /* Prepare parameters to give to image */
-    int *isw;
-    int *iew;
     int *ish;
     int *ieh;
     int *aw;
     int *ah;
     pixel **p;
-    isw = (int *)malloc(n_images * sizeof(int));
-    if (isw == NULL)
-    {
-        fprintf(stderr, "Unable to allocate width of size %d\n",
-                n_images);
-        return NULL;
-    }
-    iew = (int *)malloc(n_images * sizeof(int));
-    if (iew == NULL)
-    {
-        fprintf(stderr, "Unable to allocate height of size %d\n",
-                n_images);
-        return NULL;
-    }
     ish = (int *)malloc(n_images * sizeof(int));
     if (ish == NULL)
     {
@@ -325,8 +276,6 @@ animated_gif *createImage(int n_images, int width, int height)
     }
     for (i = 0; i < n_images; ++i)
     {
-        isw[i] = 0;
-        iew[i] = width;
         ish[i] = 0;
         ieh[i] = height;
         aw[i] = width;
@@ -376,8 +325,6 @@ animated_gif *createImage(int n_images, int width, int height)
     image->actualWidth = aw;
     image->heightStart = ish;
     image->heightEnd = ieh;
-    image->widthStart = isw;
-    image->widthEnd = iew;
     image->p = p;
 
     printf("Original Animated Image, with %d images:\n", n_images);
