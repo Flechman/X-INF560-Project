@@ -143,6 +143,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             double ieh = end * actualHeight[i];
             heightStart[i] = round(ish);
             heightEnd[i] = round(ieh);
+            if (end == 0) { actualWidth[i] = 0; }
         }
         #if SOBELF_DEBUG
             if (i2 < n)
@@ -959,6 +960,8 @@ int main( int argc, char ** argv )
 
     printf( "GIF loaded from file %s with %d image(s) in %lf s\n", 
             input_filename, image->n_images, duration ) ;
+
+    MPI_IBarrier(MPI_Comm comm, MPI_Request * req);
 
     /*==============================================*/
     /*================= FILTER =====================*/
