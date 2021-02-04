@@ -141,10 +141,6 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
         actualHeight[i] = (i2 >= n) ? 0 : original->actualHeight[i2];
         printf("  Image #%d for Process %d:\n", i, rank);
         fflush(stdout);
-        if (i < n)
-        {
-            printf("    - ActualWidth = %d | ActualHeight = %d\n", actualWidth[i], actualHeight[i]);
-        }
         if (i < n_images - 1)
         {
             double ish = tmpStart * actualHeight[i];
@@ -163,9 +159,10 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
             double ieh = end * actualHeight[i];
             heightStart[i] = round(ish);
             heightEnd[i] = round(ieh);
-            if(end == 0) { actualWidth[i] = 0; }
+            if(end == 0) { actualWidth[i] = 0; actualHeight[i] = 0; }
             printf("    - Width = %d | Height = %d\n", actualWidth[i], heightEnd[i] - heightStart[i]);
         }
+        printf("    - ActualWidth = %d | ActualHeight = %d\n", actualWidth[i], actualHeight[i]);
         fflush(stdout);
     }
 
