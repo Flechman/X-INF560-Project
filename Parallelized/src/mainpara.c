@@ -143,7 +143,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             double ieh = end * actualHeight[i];
             heightStart[i] = round(ish);
             heightEnd[i] = round(ieh);
-            if (end == 0) { actualWidth[i] = 0; }
+            if (end == 0) { actualWidth[i] = 0; actualHeight[i] = 0; }
         }
         #if SOBELF_DEBUG
             if (i2 < n)
