@@ -34,7 +34,7 @@ int main(void)
     int i;
 
     /* Image parameters ; CHANGE HERE PARAMETERS */
-    int n_images = 3;
+    int n_images = 2;
     int width = 100;
     int height = 100;
     int size = 2; //Number of processes
@@ -163,6 +163,7 @@ animated_gif *load_pixels(animated_gif *original, int rank, int size)
             double ieh = end * actualHeight[i];
             heightStart[i] = round(ish);
             heightEnd[i] = round(ieh);
+            if(end == 0) { actualWidth[i] = 0; }
             printf("    - Width = %d | Height = %d\n", actualWidth[i], heightEnd[i] - heightStart[i]);
         }
         fflush(stdout);
