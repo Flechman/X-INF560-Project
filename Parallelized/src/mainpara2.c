@@ -163,7 +163,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = 0; j < topSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightStart[i] - topSize + j, MPI_COMM_WORLD); //ANY_SOURCE IS FALSE
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightStart[i] - topSize + j, MPI_COMM_WORLD);
                     for (k = 0; k < width; ++k)
                     {
                         pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
@@ -174,7 +174,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = 0; j < bottomSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightEnd + j, MPI_COMM_WORLD); //ANY_SOURCE IS FALSE
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightEnd + j, MPI_COMM_WORLD);
                     for (k = 0; k < width; ++k)
                     {
                         pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
@@ -308,7 +308,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = 0; j < topSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightStart - topSize + j, MPI_COMM_WORLD); //ANY_SOURCE IS FALSE
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightStart - topSize + j, MPI_COMM_WORLD);
                     for (k = 0; k < width; ++k)
                     {
                         pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
@@ -319,7 +319,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = 0; j < bottomSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightEnd[i] + j, MPI_COMM_WORLD); //ANY_SOURCE IS FALSE
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightEnd[i] + j, MPI_COMM_WORLD);
                     for (k = 0; k < width; ++k)
                     {
                         pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
@@ -407,7 +407,9 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
                 }
             }
-            //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0 ?
+            //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
+            int* received_end = malloc((nbProc-1) * sizeof(int));
+            MPI_Allgather(&end, 1, MPI_INTEGER, received_end, (nbProc - 1), MPI_INTEGER, MPI_COMM_WORLD);
 
         } while (threshold > 0 && !end);
 
