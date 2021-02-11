@@ -1377,6 +1377,10 @@ int main(int argc, char **argv)
             return 1;
         }
     }
+
+    print("Sucessfully loaded in process 0 (message from process %d)\n", rank);
+    fflush(stdout);
+
     image = distribute_image(image, rank, size);
     if (image == NULL)
     {
