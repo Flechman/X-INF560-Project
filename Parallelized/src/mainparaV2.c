@@ -1246,8 +1246,8 @@ void apply_sobel_filter(animated_gif *image, int rank, int size)
                 dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].g;
                 dataSend[j + 2 * width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].b;
             }
-            MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank-1, image->heightStart[i], MPI_COMM_WORLD);
             MPI_Recv(dataRecv, 3 * width, MPI_INTEGER, rank-1, image->heightStart[i]-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank-1, image->heightStart[i], MPI_COMM_WORLD);
             for(j = 0; j < width; ++j) {
                 pixel new_pixel = {.r = dataRecv[j], .g = dataRecv[j + width], .b = dataRecv[j + 2 * width]};
                 below[TWO_D_TO_ONE_D(0, j, width)] = new_pixel;
