@@ -319,31 +319,35 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
             for(j = 1; j < size; ++j) {
                 int startIndex = round(j * fractionImage);
                 int endIndex = round(startIndex + fractionImage);
-                for(k = startIndex; k < endIndex; ++k) {
-                    int* data = malloc(actualWidth[i] * 3 * sizeof(int));
+                int height = endIndex - startIndex;
+                int rowLength = actualWidth[i] * 3;
+                int *data = malloc(rowLength * height * sizeof(int));
+                for(k = 0; k < height; ++k) {
                     for(l = 0; l < actualWidth[i]; ++l) {
-                        data[l] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].r;
-                        data[l + actualWidth[i]] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].g;
-                        data[l + 2 * actualWidth[i]] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].b;
+                        data[l + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].r;
+                        data[l + actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].g;
+                        data[l + 2 * actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].b;
                     }
-                    MPI_Send(data, actualWidth[i] * 3, MPI_INTEGER, j, k, MPI_COMM_WORLD);
-                    free(data);
                 }
+                MPI_Send(data, rowLength * height, MPI_INTEGER, j, i, MPI_COMM_WORLD);
+                free(data);
             }
         } else {
             //Receive every pixel, store them
-            for(j = heightStart[i]; j < heightEnd[i]; ++j) {
-                int *data = malloc(actualWidth[i] * 3 * sizeof(int));
-                MPI_Recv(data, actualWidth[i] * 3, MPI_INTEGER, 0, j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                int j2 = j-heightStart[i];
+            int height = heightEnd[i] - heightStart[i];
+            int rowLength = actualWidth[i] * 3;
+            int *data = malloc(rowLength * height * sizeof(int));
+            MPI_Recv(data, rowLength * height, MPI_INTEGER, 0, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            for(j = 0; j < height; ++j) {
                 for(k = 0; k < actualWidth[i]; ++k) {
-                    pixel new_pixel = {.r = data[k], .g = data[k + actualWidth[i]], .b = data[k + 2 * actualWidth[i]]};
-                    p[i][TWO_D_TO_ONE_D(j2, k, actualWidth[i])] = new_pixel;
+                    pixel new_pixel = {.r = data[k + j * rowLength], 
+                                       .g = data[k + actualWidth[i] + j * rowLength], 
+                                       .b = data[k + 2 * actualWidth[i] + j * rowLength] };
+                    p[i][TWO_D_TO_ONE_D(j, k, actualWidth[i])] = new_pixel;
                 }
-                free(data);
             }
+            free(data);
         }
-        MPI_Barrier(MPI_COMM_WORLD);
     }
 
     if(rank == 0) {
