@@ -39,6 +39,12 @@ typedef struct animated_gif
                          DO NOT MODIFY */
 } animated_gif;
 
+/* Min and Max functions */
+int min(int a, int b) { return (a < b) ? a : b; }
+int max(int a, int b) { return (a > b) ? a : b; }
+double min(double a, double b) { return (a < b) ? a : b; }
+double max(double a, double b) { return (a > b) ? a : b; }
+
 /*
  * Load a GIF image from a file and return a
  * structure of type animated_gif.
@@ -1387,7 +1393,7 @@ int main(int argc, char **argv)
     printf("GIF loaded from file %s with %d image(s) in %lf s\n",
            input_filename, image->n_images, duration);
 
-    MPI_IBarrier(MPI_Comm comm, MPI_Request * req);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     /*==============================================*/
     /*================= FILTER =====================*/
