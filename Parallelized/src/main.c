@@ -796,83 +796,173 @@ apply_blur_filter( animated_gif * image, int size, int threshold )
 
 }
 
+
     void
-apply_sobel_filter( animated_gif * image )
+apply_sobel_filter( animated_gif * image, int rank, int size)
 {
     int i, j, k ;
     int width, height ;
-
+    MPI_Status status;
     pixel ** p ;
 
     p = image->p ;
 
+
+
     for ( i = 0 ; i < image->n_images ; i++ )
     {
-        width = image->width[i] ;
-        height = image->height[i] ;
 
-        pixel * sobel ;
+        pixel *left_border_pixels;
+        pixel *right_border_pixels;
+        int left_neighbor = -1;
+        int right_neighbor = -1;
+
+        /* sharing_enabled is used to check if there would be communication */
+        bool sharing_enabled = false;
+
+        width = image->actualWidth[i];
+        height = image->heightEnd[i] - image->heightStart[i] ;
+        pixel * sobel ; 
 
         sobel = (pixel *)malloc(width * height * sizeof( pixel ) ) ;
+        left_border_pixels = (pixel *) malloc(width * sizeof(pixel)); /* This stores the first line from right neighbor */
+        right_border_pixels = (pixel *) malloc(width * sizeof(pixel)); /* This stores the first line from left neighbor */
 
-        for(j=1; j<height-1; j++)
+
+
+
+        if (height <= 0 ) {
+            /* This case is to erradicate the case where height is 0 */
+        }
+        else
         {
-            for(k=1; k<width-1; k++)
+            if (height != image->actualHeight[i]) {
+                sharing_enabled = true;
+            }
+
+            if (sharing_enabled) {
+                // determine your neighbors
+
+                if(image->heightStart[i] != 0) {
+                    left_neighbor = rank - 1;
+                }
+                if (image->heightEnd[i] != image->actualHeight[i])
+                    right_neighbor = rank + 1;
+            }
+
+
+            if (left_neighbor != -1)
             {
-                int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
-                int pixel_blue_so, pixel_blue_s, pixel_blue_se;
-                int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+                for(j= width*(height - 1); j < width * height; j++){
+                    int _j = j % width; /* To convert 0 -> (width * height) to 0 -> width */
+                    right_border_pixels[_j].r = p[i][j].r;
+                    right_border_pixels[_j].b = p[i][j].b;
+                    right_border_pixels[_j].g = p[i][j].g;
+                }
 
-                float deltaX_blue ;
-                float deltaY_blue ;
-                float val_blue;
+                MPI_Recv(left_border_pixels, 3*width, MPI_INTEGER, left_neighbor, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+                MPI_Send(right_border_pixels, 3*width,  MPI_INTEGER, left_neighbor, rank, MPI_COMM_WORLD);
+            }
+            if (right_neighbor != -1) {
+                printf("start = %d; end = %d\n", width * (height - 1), width * height);
 
-                pixel_blue_no = p[i][CONV(j-1,k-1,width)].b ;
-                pixel_blue_n  = p[i][CONV(j-1,k  ,width)].b ;
-                pixel_blue_ne = p[i][CONV(j-1,k+1,width)].b ;
-                pixel_blue_so = p[i][CONV(j+1,k-1,width)].b ;
-                pixel_blue_s  = p[i][CONV(j+1,k  ,width)].b ;
-                pixel_blue_se = p[i][CONV(j+1,k+1,width)].b ;
-                pixel_blue_o  = p[i][CONV(j  ,k-1,width)].b ;
-                pixel_blue    = p[i][CONV(j  ,k  ,width)].b ;
-                pixel_blue_e  = p[i][CONV(j  ,k+1,width)].b ;
+                for(j= width * (height - 1); j < width * height; j++){
 
-                deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
-
-                deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
-
-                val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
+                    int _j = j % width; /* To convert 0 -> (width * height) to 0 -> width */
+                    left_border_pixels[_j].r = p[i][j].r;
+                    left_border_pixels[_j].b = p[i][j].b;
+                    left_border_pixels[_j].g = p[i][j].g;
 
 
-                if ( val_blue > 50 ) 
+                }
+                MPI_Send(left_border_pixels, 3*width, MPI_INTEGER, right_neighbor, rank, MPI_COMM_WORLD);
+                MPI_Recv(right_border_pixels, 3*width, MPI_INTEGER, right_neighbor, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+            }
+
+
+            int start = 1;
+            int end = height - 1;
+
+            if(left_neighbor != -1)
+                start = image->heightStart[i];
+            if(right_neighbor != -1)
+                end = image->heightEnd[i];
+
+            for(j= start; j<end; j++)
+            {
+                for(k=1; k<width-1; k++)
                 {
-                    sobel[CONV(j  ,k  ,width)].r = 255 ;
-                    sobel[CONV(j  ,k  ,width)].g = 255 ;
-                    sobel[CONV(j  ,k  ,width)].b = 255 ;
-                } else
-                {
-                    sobel[CONV(j  ,k  ,width)].r = 0 ;
-                    sobel[CONV(j  ,k  ,width)].g = 0 ;
-                    sobel[CONV(j  ,k  ,width)].b = 0 ;
+
+                    int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
+                    int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+                    int pixel_blue_so, pixel_blue_s, pixel_blue_se;
+
+                    float deltaX_blue ;
+                    float deltaY_blue ;
+                    float val_blue;
+
+                    if (j == (image->heightEnd[i] - 1)){
+                        pixel_blue_no = right_border_pixels[TWO_D_TO_ONE_D(j-1,k-1,width) % width].b;
+                        pixel_blue_n  = right_border_pixels[TWO_D_TO_ONE_D(j-1,k  ,width) % width].b ;
+                        pixel_blue_ne = right_border_pixels[TWO_D_TO_ONE_D(j-1,k+1,width) % width].b ;
+                    }
+                    else {
+                        pixel_blue_no = p[i][TWO_D_TO_ONE_D(j-1,k-1,width)].b ;
+                        pixel_blue_n  = p[i][TWO_D_TO_ONE_D(j-1,k  ,width)].b ;
+                        pixel_blue_ne = p[i][TWO_D_TO_ONE_D(j-1,k+1,width)].b ;
+                    }
+                    if (j == image->heightStart[i]) {
+                        pixel_blue_so = left_border_pixels[TWO_D_TO_ONE_D(j+1,k-1,width) % width].b ;
+                        pixel_blue_s  = left_border_pixels[TWO_D_TO_ONE_D(j+1,k  ,width) % width].b ;
+                        pixel_blue_se = left_border_pixels[TWO_D_TO_ONE_D(j+1,k+1,width) % width].b ;
+                    }
+                    else {
+                        pixel_blue_so = p[i][TWO_D_TO_ONE_D(j+1,k-1,width)].b ;
+                        pixel_blue_s  = p[i][TWO_D_TO_ONE_D(j+1,k  ,width)].b ;
+                        pixel_blue_se = p[i][TWO_D_TO_ONE_D(j+1,k+1,width)].b ;
+                    }
+                    pixel_blue_o  = p[i][TWO_D_TO_ONE_D(j  ,k-1,width)].b ;
+                    pixel_blue    = p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b ;
+                    pixel_blue_e  = p[i][TWO_D_TO_ONE_D(j  ,k+1,width)].b ;
+
+                    deltaX_blue = -pixel_blue_no + pixel_blue_ne - 2*pixel_blue_o + 2*pixel_blue_e - pixel_blue_so + pixel_blue_se;             
+
+                    deltaY_blue = pixel_blue_se + 2*pixel_blue_s + pixel_blue_so - pixel_blue_ne - 2*pixel_blue_n - pixel_blue_no;
+
+                    val_blue = sqrt(deltaX_blue * deltaX_blue + deltaY_blue * deltaY_blue)/4;
+                    //val_blue = 50;
+
+
+                    if ( val_blue > 50 ) 
+                    {
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r = 255 ;
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g = 255 ;
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b = 255 ;
+                    } else
+                    {
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r = 0 ;
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g = 0 ;
+                        sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b = 0 ;
+                    }
                 }
             }
-        }
 
-        for(j=1; j<height-1; j++)
-        {
-            for(k=1; k<width-1; k++)
+            for(j=1; j<height-1; j++)
             {
-                p[i][CONV(j  ,k  ,width)].r = sobel[CONV(j  ,k  ,width)].r ;
-                p[i][CONV(j  ,k  ,width)].g = sobel[CONV(j  ,k  ,width)].g ;
-                p[i][CONV(j  ,k  ,width)].b = sobel[CONV(j  ,k  ,width)].b ;
+                for(k=1; k<width-1; k++)
+                {
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].r = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].r ;
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].g = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].g ;
+                    p[i][TWO_D_TO_ONE_D(j  ,k  ,width)].b = sobel[TWO_D_TO_ONE_D(j  ,k  ,width)].b ;
+                }
             }
         }
 
         free (sobel) ;
     }
 
-}
 
+}
 /*
  * Main entry point
  */
