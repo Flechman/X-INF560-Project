@@ -12,7 +12,7 @@ SRC= dgif_lib.c \
 	 gif_font.c \
 	 gif_hash.c \
 	 gifalloc.c \
-	 mainpara.c \
+	 mainparaV2.c \
 	 openbsd-reallocarray.c \
 	 quantize.c
 
@@ -22,7 +22,7 @@ OBJ= $(OBJ_DIR)/dgif_lib.o \
 	 $(OBJ_DIR)/gif_font.o \
 	 $(OBJ_DIR)/gif_hash.o \
 	 $(OBJ_DIR)/gifalloc.o \
-	 $(OBJ_DIR)/mainpara.o \
+	 $(OBJ_DIR)/mainparaV2.o \
 	 $(OBJ_DIR)/openbsd-reallocarray.o \
 	 $(OBJ_DIR)/quantize.o
 

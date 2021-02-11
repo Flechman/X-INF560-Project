@@ -13,16 +13,13 @@ for i in $INPUT_DIR/*gif ; do
     DEST=$OUTPUT_DIR/`basename $i .gif`-sobel.gif
     echo "Running test on $i -> $DEST"
 
-    if [[ $ARGC -eq 0 ]] 
-    then
-        ./sobelf $i $DEST
-    elif [[ $ARGC -eq 1 ]]
+    if [[ $ARGC -eq 1 ]]
     then
         salloc -n $1 mpirun ./sobelf $i $DEST
     elif [[ $ARGC -eq 2 ]]
     then
         salloc -n $1 -N $2  mpirun ./sobelf $i $DEST
     else
-        echo "You have to provide an argument for the number of process and/or number of nodes"
+        echo "You have to provide one or more arguments for the number of processes and/or number of nodes"
     fi
 done
