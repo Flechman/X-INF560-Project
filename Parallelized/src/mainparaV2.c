@@ -318,7 +318,7 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
             //Send to every process its pixels
             for(j = 1; j < size; ++j) {
                 int startIndex = round(j * fractionImage * actualHeight[i]);
-                int endIndex = round((startIndex + fractionImage) * actualHeight[i]);
+                int endIndex = round((j+1) * fractionImage * actualHeight[i]);
                 int height = endIndex - startIndex;
                 int rowLength = actualWidth[i] * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
@@ -433,7 +433,7 @@ int merge_image(animated_gif* image, int rank, int size) {
             for (j = 1; j < size; ++j)
             {
                 int startIndex = round(j * fractionImage * image->actualHeight[i]);
-                int endIndex = round((startIndex + fractionImage) * image->actualHeight[i]);
+                int endIndex = round((j+1) * fractionImage * image->actualHeight[i]);
                 int height = endIndex - startIndex;
                 int rowLength = width * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
