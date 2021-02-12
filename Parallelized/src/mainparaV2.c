@@ -322,6 +322,10 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
                 int height = endIndex - startIndex;
                 int rowLength = actualWidth[i] * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
+                if(data == NULL) {
+                    printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
+                    return 0;
+                }
                 for(k = 0; k < height; ++k) {
                     for(l = 0; l < actualWidth[i]; ++l) {
                         data[l + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].r;
@@ -337,6 +341,10 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
             int height = heightEnd[i] - heightStart[i];
             int rowLength = actualWidth[i] * 3;
             int *data = malloc(rowLength * height * sizeof(int));
+            if(data == NULL) {
+                printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
+                return 0;
+            }
             MPI_Recv(data, rowLength * height, MPI_INTEGER, 0, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             for(j = 0; j < height; ++j) {
                 for(k = 0; k < actualWidth[i]; ++k) {
@@ -426,36 +434,47 @@ int merge_image(animated_gif* image, int rank, int size) {
             {
                 int startIndex = round(j * fractionImage);
                 int endIndex = round(startIndex + fractionImage);
-                for (k = startIndex; k < endIndex; ++k)
-                {
-                    int *data = malloc(width * 3 * sizeof(int));
-                    MPI_Recv(data, width * 3, MPI_INTEGER, j, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for(l = 0; l < width; ++l) {
-                        pixel new_pixel = {.r = data[l], .g = data[l + width], .b = data[l + 2 * width]};
-                        image->p[i][TWO_D_TO_ONE_D(k, l, width)] = new_pixel;
-                    }
-                    free(data);
+                int height = endIndex - startIndex;
+                int rowLength = width * 3;
+                int *data = malloc(rowLength * height * sizeof(int));
+                if(data == NULL) {
+                    printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
+                    return 0;
                 }
+                MPI_Recv(data, rowLength * height, MPI_INTEGER, j, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                for (k = 0; k < height; ++k)
+                {
+                    int k2 = k+startIndex;
+                    for(l = 0; l < width; ++l) {
+                        pixel new_pixel = {.r = data[l + k * rowLength], .g = data[l + width + k * rowLength], .b = data[l + 2 * width + k * rowLength]};
+                        image->p[i][TWO_D_TO_ONE_D(k2, l, width)] = new_pixel;
+                    }
+                }
+                free(data);
             }
         }
         else
         {
             //Send every pixel to process 0
-            for (j = image->heightStart[i]; j < image->heightEnd[i]; ++j)
+            int height = image->heightEnd[i] - image->heightStart[i];
+            int rowLength = width * 3;
+            int *data = malloc(height * rowLength * sizeof(int));
+            if(data == NULL) {
+                printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
+                return 0;
+            }
+            for (j = 0; j < height; ++j)
             {
-                int *data = malloc(width * 3 * sizeof(int));
-                int j2 = image->heightStart[i];
                 for (k = 0; k < width; ++k)
                 {
-                    data[k] = image->p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                    data[k + width] = image->p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                    data[k + 2 * width] = image->p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                    data[k + j * rowLength] = image->p[i][TWO_D_TO_ONE_D(j, k, width)].r;
+                    data[k + width + j * rowLength] = image->p[i][TWO_D_TO_ONE_D(j, k, width)].g;
+                    data[k + 2 * width + j * rowLength] = image->p[i][TWO_D_TO_ONE_D(j, k, width)].b;
                 }
-                MPI_Send(data, width * 3, MPI_INTEGER, 0, j, MPI_COMM_WORLD);
-                free(data);
             }
+            MPI_Send(data, rowLength * height, MPI_INTEGER, 0, i, MPI_COMM_WORLD);
+            free(data);
         }
-        MPI_Barrier(MPI_COMM_WORLD);
     }
     
     return 1;
@@ -1240,7 +1259,15 @@ void apply_sobel_filter(animated_gif *image, int rank, int size)
         pixel *below = malloc(width * sizeof(pixel));
         if(image->heightStart[i] > 0) {
             int *dataSend = malloc(width * 3 * sizeof(int));
+            if(dataSend == NULL) {
+                printf("ERROR : could not allocate 3*%d integers\n", width);
+                return 0;
+            }
             int *dataRecv = malloc(width * 3 * sizeof(int));
+            if(dataRecv == NULL) {
+                printf("ERROR : could not allocate 3*%d integers\n", width);
+                return 0;
+            }
             for(j = 0; j < width; ++j) {
                 dataSend[j] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].r;
                 dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].g;
@@ -1257,7 +1284,15 @@ void apply_sobel_filter(animated_gif *image, int rank, int size)
         }
         if(image->heightEnd[i] < image->actualHeight[i]) {
             int *dataSend = malloc(width * 3 * sizeof(int));
+            if(dataSend == NULL) {
+                printf("ERROR : could not allocate 3*%d integers\n", width);
+                return 0;
+            }
             int *dataRecv = malloc(width * 3 * sizeof(int));
+            if(dataRecv == NULL) {
+                printf("ERROR : could not allocate 3*%d integers\n", width);
+                return 0;
+            }
             int height = image->heightEnd[i] - image->heightStart[i];
             for(j = 0; j < width; ++j) {
                 dataSend[j] = image->p[i][TWO_D_TO_ONE_D(height-1, j, width)].r;
