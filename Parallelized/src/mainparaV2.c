@@ -317,8 +317,8 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
         if(rank == 0) {
             //Send to every process its pixels
             for(j = 1; j < size; ++j) {
-                int startIndex = round(j * fractionImage);
-                int endIndex = round(startIndex + fractionImage);
+                int startIndex = round(j * fractionImage * actualHeight[i]);
+                int endIndex = round((startIndex + fractionImage) * actualHeight[i]);
                 int height = endIndex - startIndex;
                 int rowLength = actualWidth[i] * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
@@ -432,8 +432,8 @@ int merge_image(animated_gif* image, int rank, int size) {
             //Receive pixels of every process
             for (j = 1; j < size; ++j)
             {
-                int startIndex = round(j * fractionImage);
-                int endIndex = round(startIndex + fractionImage);
+                int startIndex = round(j * fractionImage * image->actualHeight[i]);
+                int endIndex = round((startIndex + fractionImage) * image->actualHeight[i]);
                 int height = endIndex - startIndex;
                 int rowLength = width * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
@@ -458,7 +458,7 @@ int merge_image(animated_gif* image, int rank, int size) {
             //Send every pixel to process 0
             int height = image->heightEnd[i] - image->heightStart[i];
             int rowLength = width * 3;
-            int *data = malloc(height * rowLength * sizeof(int));
+            int *data = malloc(rowLength * height * sizeof(int));
             if(data == NULL) {
                 printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
                 return 0;
