@@ -327,10 +327,11 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
                     return 0;
                 }
                 for(k = 0; k < height; ++k) {
+                    int k2 = k + startIndex;
                     for(l = 0; l < actualWidth[i]; ++l) {
-                        data[l + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].r;
-                        data[l + actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].g;
-                        data[l + 2 * actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k, l, actualWidth[i])].b;
+                        data[l + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].r;
+                        data[l + actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].g;
+                        data[l + 2 * actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].b;
                     }
                 }
                 MPI_Send(data, rowLength * height, MPI_INTEGER, j, i, MPI_COMM_WORLD);
