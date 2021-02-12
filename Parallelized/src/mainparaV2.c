@@ -1259,15 +1259,7 @@ void apply_sobel_filter(animated_gif *image, int rank, int size)
         pixel *below = malloc(width * sizeof(pixel));
         if(image->heightStart[i] > 0) {
             int *dataSend = malloc(width * 3 * sizeof(int));
-            if(dataSend == NULL) {
-                printf("ERROR : could not allocate 3*%d integers\n", width);
-                return 0;
-            }
             int *dataRecv = malloc(width * 3 * sizeof(int));
-            if(dataRecv == NULL) {
-                printf("ERROR : could not allocate 3*%d integers\n", width);
-                return 0;
-            }
             for(j = 0; j < width; ++j) {
                 dataSend[j] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].r;
                 dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].g;
@@ -1284,15 +1276,7 @@ void apply_sobel_filter(animated_gif *image, int rank, int size)
         }
         if(image->heightEnd[i] < image->actualHeight[i]) {
             int *dataSend = malloc(width * 3 * sizeof(int));
-            if(dataSend == NULL) {
-                printf("ERROR : could not allocate 3*%d integers\n", width);
-                return 0;
-            }
             int *dataRecv = malloc(width * 3 * sizeof(int));
-            if(dataRecv == NULL) {
-                printf("ERROR : could not allocate 3*%d integers\n", width);
-                return 0;
-            }
             int height = image->heightEnd[i] - image->heightStart[i];
             for(j = 0; j < width; ++j) {
                 dataSend[j] = image->p[i][TWO_D_TO_ONE_D(height-1, j, width)].r;
