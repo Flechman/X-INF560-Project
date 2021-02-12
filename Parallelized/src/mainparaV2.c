@@ -1149,7 +1149,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 }
 
                 /* Compute blur */
-                for (j = max(image->heightStart[i], image->actualHeight[i] + size); j < min(image->heightEnd[i], image->actualHeight[i] - size); ++j)
+                for (j = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size); j < min(image->heightEnd[i], image->actualHeight[i] - size); ++j)
                 {
                     for (k = size; k < width - size; ++k)
                     {
