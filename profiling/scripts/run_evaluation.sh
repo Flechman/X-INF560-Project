@@ -1,40 +1,49 @@
 #!/bin/bash
 
+# functions 
+help_display() {
+    printf "arg[1]-> Your script\n"
+    printf "arg[2]-> Number of process (leave out if its a sequential program)\n"
+    printf "arg[3]-> Search keyword (eg. SOBEL)\n" 
+    printf "arg[4]-> Type of program (user-specific)\n"
+    printf "arg[5]-> Title of graph\n"
+}
+
 # Exit if not script file is provided
 if [[ $# == 0 ]];
 then
-    echo "Please provide the script you would want to run"
-    echo "run script with -h or --help for details on how to run"
+    echo "Oops! No script"
+    echo "Try './$(basename $0) -h' or './$(basename $0) --help' for more details"
     exit
 elif [[ $# == 1 ]];
 then
     case $1 in
-        ("--help") printf "arg[1]-> Your script\narg[2]-> Number of process (leave out if its a sequential program)\narg[3]-> Search keyword (eg. SOBEL)\narg[4]-> Type of program (user-specific)\narg[5]-> Gnuplot file\narg[6]-> Title of graph\n";;
-    ("-h") printf "arg[1]-> Your script\narg[2]-> Number of process (leave out if its a sequential program)\narg[3]->Search keyword (eg. SOBEL)\narg[4]->Type of program (user-specific)\narg[5]-> Gnuplot file\narg[6]-> Title of graph\n";;
-esac
-exit
+        ("--help") 
+            help_display;;
+        ("-h") 
+            help_display;;
+    esac
+    exit
 fi
 
 # Variables
 CMD=$1
 CMD_DIR=$(dirname $(realpath $CMD))
 CMD_BASENAME=./$(basename $CMD)
-PLOTTER=$(realpath $4)
-TITLE_TEXT=$5
+PLOTTER=$(realpath ./evaluation.plg)
+TITLE_TEXT=$4
 EVAL="eval"
+KEYWORD=$2
+TYPE=$3
+RESULTS=RESULTS_"$TYPE".dat
 
-if [[ $# > 5 ]];
+if [[ $# > 4 ]];
 then
     CMD_ARG=$2
     KEYWORD=$3
     TYPE=$4
     RESULTS=RESULTS_"$TYPE"_"$CMD_ARG".dat
-    PLOTTER=$(realpath $5)
-    TITLE_TEXT=$6
-else
-    KEYWORD=$2
-    TYPE=$3
-    RESULTS=RESULTS_"$TYPE".dat
+    TITLE_TEXT=$5
 fi
 
 # Generate output file for graph
@@ -57,14 +66,13 @@ fi
 RESULTS=$CMD_DIR/$EVAL/$RESULTS
 OUTPUT=$CMD_DIR/$EVAL/$OUTPUT
 
-echo "-->"$RESULTS
 if [ -f "$RESULTS" ];
 then
     echo -e "#IMAGE\tN_IMAGES\tSOBEL_TIME\tIMAGE_FILE" >> $RESULTS 
 fi
 
 
-# Check command string
+# Display script state
 echo "COMMAND:" $CMD_BASENAME
 echo "COMMAND ARG:" $CMD_ARG
 echo "KEYWORD:" $KEYWORD
@@ -82,7 +90,6 @@ fi
 
 
 # Plot graph
-
 if [ -f "$RESULTS" ];
 then
     gnuplot -e "input_file='${RESULTS}'; output_file='${OUTPUT}'; title_text='${TITLE_TEXT}'" $PLOTTER 
@@ -90,5 +97,4 @@ fi
 
 # Change to previous directory
 cd "$OLDPWD"
-
 
