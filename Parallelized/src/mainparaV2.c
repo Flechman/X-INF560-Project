@@ -924,10 +924,30 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             {
                 int heightEnd = min(image->heightEnd[i], image->actualHeight[i] / 10);
 
-                /* Send Data */
+                int subStart = (size - image->heightStart[i] > 0) ? size - image->heightStart[i] : 0;
+                int subEnd = (heightEnd - 1 - (image->actualHeight[i] / 10 - size - 1) > 0) ? heightEnd - 1 - (image->actualHeight[i] / 10 - size - 1) : 0;
+                int topSize = (heightEnd <= size) ? 0 : size - subStart;
+                int bottomSize = (image->heightStart[i] >= image->actualHeight[i] / 10 - size) ? 0 : size - subEnd;
+                pixel *receivedTopPart = (pixel *)malloc(topSize * width * sizeof(pixel));
+                pixel *receivedBottomPart = (pixel *)malloc(bottomSize * width * sizeof(pixel));
+
+                /* Send & Receive Data : Receive first from upper, and then Send to upper ; Send to lower, Receive from lower */
+                /* Receive from upper */
+                for (j = 0; j < topSize; ++j)
+                {
+                    int *tmp = malloc(3 * width * sizeof(int));
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightStart[i] - topSize + j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    for (k = 0; k < width; ++k)
+                    {
+                        pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
+                        receivedTopPart[j * width + k] = new_pixel;
+                    }
+                    free(tmp);
+                }
+                /* Send to upper */
                 for (j = image->heightStart[i]; j <= min(image->heightStart[i] + size - 1, heightEnd - 1); ++j)
                 {
-                    //Send to processes having rows max(size, i-size) : heightStart-1
+                    //Send to processes having rows max(size, j-size) : heightStart-1
                     int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
                     for (k = 0; k < width; ++k)
@@ -948,9 +968,10 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(row);
                 }
+                /* Send to lower */
                 for (j = max(heightEnd - size, image->heightStart[i]); j <= heightEnd - 1; ++j)
                 {
-                    //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
+                    //Send to processes having rows heightEnd : min(H/10-size-1, j+size)
                     int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
                     for (k = 0; k < width; ++k)
@@ -971,25 +992,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(row);
                 }
-
-                /* Receive Data */
-                int subStart = (size - image->heightStart[i] > 0) ? size - image->heightStart[i] : 0;
-                int subEnd = (heightEnd - 1 - (image->actualHeight[i] / 10 - size - 1) > 0) ? heightEnd - 1 - (image->actualHeight[i] / 10 - size - 1) : 0;
-                int topSize = (heightEnd <= size) ? 0 : size - subStart;
-                int bottomSize = (image->heightStart[i] >= image->actualHeight[i] / 10 - size) ? 0 : size - subEnd;
-                pixel *receivedTopPart = (pixel *)malloc(topSize * width * sizeof(pixel));
-                pixel *receivedBottomPart = (pixel *)malloc(bottomSize * width * sizeof(pixel));
-                for (j = 0; j < topSize; ++j)
-                {
-                    int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, image->heightStart[i] - topSize + j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (k = 0; k < width; ++k)
-                    {
-                        pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
-                        receivedTopPart[j * width + k] = new_pixel;
-                    }
-                    free(tmp);
-                }
+                /* Receive from lower */
                 for (j = 0; j < bottomSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
@@ -1070,7 +1073,27 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             {
                 int heightStart = max(image->heightStart[i], image->actualHeight[i] * 0.9);
 
-                /* Send Data */
+                int subStart = (image->actualHeight[i] * 0.9 + size - heightStart > 0) ? image->actualHeight[i] * 0.9 + size - heightStart : 0;
+                int subEnd = (image->heightEnd[i] - 1 - (image->actualHeight[i] - size - 1) > 0) ? image->heightEnd[i] - 1 - (image->actualHeight[i] - size - 1) : 0;
+                int topSize = (image->heightEnd[i] <= image->actualHeight[i] * 0.9 + size) ? 0 : size - subStart;
+                int bottomSize = (image->heightStart[i] >= image->actualHeight[i] - size) ? 0 : size - subEnd;
+                pixel *receivedTopPart = (pixel *)malloc(topSize * width * sizeof(pixel));
+                pixel *receivedBottomPart = (pixel *)malloc(bottomSize * width * sizeof(pixel));
+
+                /* Send & Receive Data : Receive first from upper, and then Send to upper ; Send to lower, Receive from lower */
+                /* Receive from upper */
+                for (j = 0; j < topSize; ++j)
+                {
+                    int *tmp = malloc(3 * width * sizeof(int));
+                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightStart - topSize + j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    for (k = 0; k < width; ++k)
+                    {
+                        pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
+                        receivedTopPart[j * width + k] = new_pixel;
+                    }
+                    free(tmp);
+                }
+                /* Send to upper */
                 for (j = heightStart; j <= min(heightStart + size - 1, image->heightEnd[i] - 1); ++j)
                 {
                     //Send to processes having rows max(actualHeight * 0.9 + size, j-size) : heightStart-1
@@ -1094,6 +1117,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(row);
                 }
+                /* Send to lower */
                 for (j = max(heightStart, image->heightEnd[i] - size); j <= image->heightEnd[i] - 1; ++j)
                 {
                     //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
@@ -1117,25 +1141,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(row);
                 }
-
-                /* Receive Data */
-                int subStart = (image->actualHeight[i] * 0.9 + size - heightStart > 0) ? image->actualHeight[i] * 0.9 + size - heightStart : 0;
-                int subEnd = (image->heightEnd[i] - 1 - (image->actualHeight[i] - size - 1) > 0) ? image->heightEnd[i] - 1 - (image->actualHeight[i] - size - 1) : 0;
-                int topSize = (image->heightEnd[i] <= image->actualHeight[i] * 0.9 + size) ? 0 : size - subStart;
-                int bottomSize = (image->heightStart[i] >= image->actualHeight[i] - size) ? 0 : size - subEnd;
-                pixel *receivedTopPart = (pixel *)malloc(topSize * width * sizeof(pixel));
-                pixel *receivedBottomPart = (pixel *)malloc(bottomSize * width * sizeof(pixel));
-                for (j = 0; j < topSize; ++j)
-                {
-                    int *tmp = malloc(3 * width * sizeof(int));
-                    MPI_Recv(tmp, 3 * width, MPI_INTEGER, MPI_ANY_SOURCE, heightStart - topSize + j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (k = 0; k < width; ++k)
-                    {
-                        pixel new_pixel = {.r = tmp[k], .g = tmp[k + width], .b = tmp[k + 2 * width]};
-                        receivedTopPart[j * width + k] = new_pixel;
-                    }
-                    free(tmp);
-                }
+                /* Receive from lower */
                 for (j = 0; j < bottomSize; ++j)
                 {
                     int *tmp = malloc(3 * width * sizeof(int));
@@ -1230,12 +1236,15 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
             int *received_end = malloc((nbProc - 1) * sizeof(int));
             MPI_Allgather(&end, 1, MPI_INTEGER, received_end, (nbProc - 1), MPI_INTEGER, MPI_COMM_WORLD);
+            for(j = 0; j < nbProc-1; ++j) {
+                if(received_end[j] == 0) { end = 0; }
+            }
 
         } while (threshold > 0 && !end);
 
-#if SOBELF_DEBUG
+    #if SOBELF_DEBUG
         printf("BLUR: number of iterations for image %d\n", n_iter);
-#endif
+    #endif
 
         free(new);
     }
