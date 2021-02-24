@@ -1135,7 +1135,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 {
                     int j2 = j - image->heightStart[i];
                     //Send to processes having rows max(actualHeight * 0.9 + size, j-size) : heightStart-1
-                    int *rowU[j2] = malloc(width * 3 * sizeof(int));
+                    rowU[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
                         rowU[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
@@ -1166,7 +1166,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 {
                     int j2 = j - image->heightStart[i];
                     //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
-                    int *rowL[j2] = malloc(width * 3 * sizeof(int));
+                    rowL[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
                         rowL[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
