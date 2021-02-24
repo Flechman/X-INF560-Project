@@ -920,6 +920,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 }
             }
 
+            /* First 10% of the image */
             if (image->heightStart[i] < image->actualHeight[i] / 10)
             {
                 int heightEnd = min(image->heightEnd[i], image->actualHeight[i] / 10);
@@ -945,16 +946,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     free(tmp);
                 }
                 /* Send to upper */
+                int rowUSize = (min(image->heightStart[i] + size - 1, heightEnd - 1) - image->heightStart[i] + 1);
+                int **rowU = malloc(rowUSize * sizeof(int*));
+                MPI_Request **requestsU = malloc(rowUSize * sizeof(MPI_Request *));
+                int *countU = malloc(rowUSize * sizeof(int));
                 for (j = image->heightStart[i]; j <= min(image->heightStart[i] + size - 1, heightEnd - 1); ++j)
                 {
-                    //Send to processes having rows max(size, j-size) : heightStart-1
-                    int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
+                    //Send to processes having rows max(size, j-size) : heightStart-1
+                    rowU[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        row[k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        row[k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        row[k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowU[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowU[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowU[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
                     for (k = max(size, j - size); k <= image->heightStart[i] - 1; ++k)
@@ -963,22 +968,29 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            MPI_Send(row, 3 * width, MPI_INTEGER, to_rank, j, MPI_COMM_WORLD);
+                            ++countU[j2];
                         }
                     }
-                    free(row);
+                    requestsU[j2] = malloc(countU[j2] * sizeof(MPI_Request));
+                    for(k = 0; k < countU[j2]; ++k) {
+                        MPI_Isend(rowU[j2], 3 * width, MPI_INTEGER, rank-k-1, j, MPI_COMM_WORLD, &requestsU[j2][k]);
+                    }
                 }
                 /* Send to lower */
+                int rowLSize = (heightEnd - 1 - max(heightEnd - size, image->heightStart[i]) + 1);
+                int **rowL = malloc(rowLSize * sizeof(int *));
+                MPI_Request **requestsL = malloc(rowLSize * sizeof(MPI_Request *));
+                int *countL = malloc(rowLSize * sizeof(int));
                 for (j = max(heightEnd - size, image->heightStart[i]); j <= heightEnd - 1; ++j)
                 {
-                    //Send to processes having rows heightEnd : min(H/10-size-1, j+size)
-                    int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
+                    //Send to processes having rows heightEnd : min(H/10-size-1, j+size)
+                    rowL[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        row[k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        row[k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        row[k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowL[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowL[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
                     for (k = heightEnd; k <= min(image->actualHeight[i] / 10 - size - 1, j + size); ++k)
@@ -987,10 +999,13 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            MPI_Send(row, 3 * width, MPI_INTEGER, to_rank, j, MPI_COMM_WORLD);
+                            ++countL[j2];
                         }
                     }
-                    free(row);
+                    requestsL[j2] = malloc(countL[j2] * sizeof(MPI_Request));
+                    for(k = 0; k < countL[j2]; ++k) {
+                        MPI_Isend(rowL[j2], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j2][k]);
+                    }
                 }
                 /* Receive from lower */
                 for (j = 0; j < bottomSize; ++j)
@@ -1004,6 +1019,23 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(tmp);
                 }
+
+                for(j = 0; j < rowUSize; ++j) {
+                    MPI_Waitall(countU[j], requestsU[j], MPI_STATUSES_IGNORE);
+                    free(rowU[j]);
+                    free(requestsU[j]);
+                }
+                for(j = 0; j < rowLSize; ++j) {
+                    MPI_Waitall(countL[j], requestsL[j], MPI_STATUSES_IGNORE);
+                    free(rowL[j]);
+                    free(requestsL[j]);
+                }
+                free(rowU);
+                free(rowL);
+                free(requestsU);
+                free(requestsL);
+                free(countU);
+                free(countL);
 
                 /* Compute blur */
                 for (j = max(image->heightStart[i], size); j < min(image->heightEnd[i], image->actualHeight[i] / 10 - size); ++j)
@@ -1069,6 +1101,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 }
             }
 
+            /* Last 10% of the image */
             if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
             {
                 int heightStart = max(image->heightStart[i], image->actualHeight[i] * 0.9);
@@ -1094,16 +1127,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     free(tmp);
                 }
                 /* Send to upper */
+                int rowUSize = min(heightStart + size - 1, image->heightEnd[i] - 1) - heightStart + 1;
+                int **rowU = malloc(rowUSize * sizeof(int *));
+                MPI_Request **requestsU = malloc(rowUSize * sizeof(MPI_Request *));
+                int *countU = malloc(rowUSize * sizeof(int));
                 for (j = heightStart; j <= min(heightStart + size - 1, image->heightEnd[i] - 1); ++j)
                 {
-                    //Send to processes having rows max(actualHeight * 0.9 + size, j-size) : heightStart-1
-                    int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
+                    //Send to processes having rows max(actualHeight * 0.9 + size, j-size) : heightStart-1
+                    int *rowU[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        row[k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        row[k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        row[k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowU[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowU[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowU[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
                     for (k = max(image->actualHeight[i] * 0.9 + size, j - size); k <= heightStart - 1; ++k)
@@ -1112,22 +1149,29 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            MPI_Send(row, 3 * width, MPI_INTEGER, to_rank, j, MPI_COMM_WORLD);
+                            ++countU[j2];
                         }
                     }
-                    free(row);
+                    requestsU[j2] = malloc(countU[j2] * sizeof(MPI_Request));
+                    for(k = 0; k < countU[j2]; ++k) {
+                        MPI_Isend(rowU[j2], 3 * width, MPI_INTEGER, rank-k-1, j, MPI_COMM_WORLD, &requestsU[j2][k]);
+                    }
                 }
                 /* Send to lower */
+                int rowLSize = image->heightEnd[i] - 1 - max(heightStart, image->heightEnd[i] - size) + 1;
+                int **rowL = malloc(rowLSize * sizeof(int *));
+                MPI_Request **requestsL = malloc(rowLSize * sizeof(MPI_Request *));
+                int *countL = malloc(rowLSize * sizeof(int));
                 for (j = max(heightStart, image->heightEnd[i] - size); j <= image->heightEnd[i] - 1; ++j)
                 {
-                    //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
-                    int *row = malloc(width * 3 * sizeof(int));
                     int j2 = j - image->heightStart[i];
+                    //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
+                    int *rowL[j2] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        row[k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        row[k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        row[k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowL[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowL[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
                     for (k = image->heightEnd[i]; k <= min(image->actualHeight[i] - size - 1, j + size); ++k)
@@ -1136,10 +1180,14 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            MPI_Send(row, 3 * width, MPI_INTEGER, to_rank, j, MPI_COMM_WORLD);
+                            ++countL[j2];
                         }
                     }
-                    free(row);
+                    requestsL[j2] = malloc(countL[j2] * sizeof(MPI_Request));
+                    for (k = 0; k < countL[j2]; ++k)
+                    {
+                        MPI_Isend(rowL[j2], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j2][k]);
+                    }
                 }
                 /* Receive from lower */
                 for (j = 0; j < bottomSize; ++j)
@@ -1153,6 +1201,23 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                     free(tmp);
                 }
+
+                for(j = 0; j < rowUSize; ++j) {
+                    MPI_Waitall(countU[j], requestsU[j], MPI_STATUSES_IGNORE);
+                    free(rowU[j]);
+                    free(requestsU[j]);
+                }
+                for(j = 0; j < rowLSize; ++j) {
+                    MPI_Waitall(countL[j], requestsL[j], MPI_STATUSES_IGNORE);
+                    free(rowL[j]);
+                    free(requestsL[j]);
+                }
+                free(rowU);
+                free(rowL);
+                free(requestsU);
+                free(requestsL);
+                free(countU);
+                free(countL);
 
                 /* Compute blur */
                 for (j = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size); j < min(image->heightEnd[i], image->actualHeight[i] - size); ++j)
@@ -1239,6 +1304,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             for(j = 0; j < nbProc-1; ++j) {
                 if(received_end[j] == 0) { end = 0; }
             }
+            free(received_end);
 
         } while (threshold > 0 && !end);
 
