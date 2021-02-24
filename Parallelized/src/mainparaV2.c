@@ -985,28 +985,29 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = max(heightEnd - size, image->heightStart[i]); j <= heightEnd - 1; ++j)
                 {
                     int j2 = j - image->heightStart[i];
+                    int j3 = j - max(heightEnd - size, image->heightStart[i]);
                     //Send to processes having rows heightEnd : min(H/10-size-1, j+size)
-                    rowL[j2] = malloc(width * 3 * sizeof(int));
+                    rowL[j3] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        rowL[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        rowL[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowL[j3][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowL[j3][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowL[j3][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
-                    countL[j2] = 0;
+                    countL[j3] = 0;
                     for (k = heightEnd; k <= min(image->actualHeight[i] / 10 - size - 1, j + size); ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, true);
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            ++countL[j2];
+                            ++countL[j3];
                         }
                     }
-                    requestsL[j2] = malloc(countL[j2] * sizeof(MPI_Request));
-                    for(k = 0; k < countL[j2]; ++k) {
-                        MPI_Isend(rowL[j2], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j2][k]);
+                    requestsL[j3] = malloc(countL[j3] * sizeof(MPI_Request));
+                    for(k = 0; k < countL[j3]; ++k) {
+                        MPI_Isend(rowL[j3], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j3][k]);
                     }
                 }
                 /* Receive from lower */
@@ -1136,28 +1137,29 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = heightStart; j <= min(heightStart + size - 1, image->heightEnd[i] - 1); ++j)
                 {
                     int j2 = j - image->heightStart[i];
+                    int j3 = j - heightStart;
                     //Send to processes having rows max(actualHeight * 0.9 + size, j-size) : heightStart-1
-                    rowU[j2] = malloc(width * 3 * sizeof(int));
+                    rowU[j3] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        rowU[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        rowU[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        rowU[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowU[j3][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowU[j3][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowU[j3][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
-                    countU[j2] = 0;
+                    countU[j3] = 0;
                     for (k = max(image->actualHeight[i] * 0.9 + size, j - size); k <= heightStart - 1; ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, false);
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            ++countU[j2];
+                            ++countU[j3];
                         }
                     }
-                    requestsU[j2] = malloc(countU[j2] * sizeof(MPI_Request));
-                    for(k = 0; k < countU[j2]; ++k) {
-                        MPI_Isend(rowU[j2], 3 * width, MPI_INTEGER, rank-k-1, j, MPI_COMM_WORLD, &requestsU[j2][k]);
+                    requestsU[j3] = malloc(countU[j3] * sizeof(MPI_Request));
+                    for(k = 0; k < countU[j3]; ++k) {
+                        MPI_Isend(rowU[j3], 3 * width, MPI_INTEGER, rank-k-1, j, MPI_COMM_WORLD, &requestsU[j3][k]);
                     }
                 }
                 /* Send to lower */
@@ -1168,29 +1170,30 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 for (j = max(heightStart, image->heightEnd[i] - size); j <= image->heightEnd[i] - 1; ++j)
                 {
                     int j2 = j - image->heightStart[i];
+                    int j3 = j - max(heightStart, image->heightEnd[i] - size);
                     //Send to processes having rows heightEnd : min(H/10-size-1, i+size)
-                    rowL[j2] = malloc(width * 3 * sizeof(int));
+                    rowL[j3] = malloc(width * 3 * sizeof(int));
                     for (k = 0; k < width; ++k)
                     {
-                        rowL[j2][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                        rowL[j2][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                        rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                        rowL[j3][k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        rowL[j3][k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        rowL[j3][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
-                    countL[j2] = 0;
+                    countL[j3] = 0;
                     for (k = image->heightEnd[i]; k <= min(image->actualHeight[i] - size - 1, j + size); ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, true);
                         if (new_to_rank != to_rank)
                         {
                             to_rank = new_to_rank;
-                            ++countL[j2];
+                            ++countL[j3];
                         }
                     }
-                    requestsL[j2] = malloc(countL[j2] * sizeof(MPI_Request));
-                    for (k = 0; k < countL[j2]; ++k)
+                    requestsL[j3] = malloc(countL[j3] * sizeof(MPI_Request));
+                    for (k = 0; k < countL[j3]; ++k)
                     {
-                        MPI_Isend(rowL[j2], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j2][k]);
+                        MPI_Isend(rowL[j3], 3 * width, MPI_INTEGER, rank+k+1, j, MPI_COMM_WORLD, &requestsL[j3][k]);
                     }
                 }
                 /* Receive from lower */
