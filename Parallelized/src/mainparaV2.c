@@ -962,6 +962,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         rowU[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
+                    countU[j2] = 0;
                     for (k = max(size, j - size); k <= image->heightStart[i] - 1; ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, false);
@@ -993,6 +994,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
+                    countL[j2] = 0;
                     for (k = heightEnd; k <= min(image->actualHeight[i] / 10 - size - 1, j + size); ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, true);
@@ -1143,6 +1145,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         rowU[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
+                    countU[j2] = 0;
                     for (k = max(image->actualHeight[i] * 0.9 + size, j - size); k <= heightStart - 1; ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, false);
@@ -1174,6 +1177,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                         rowL[j2][k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                     int to_rank = rank;
+                    countL[j2] = 0;
                     for (k = image->heightEnd[i]; k <= min(image->actualHeight[i] - size - 1, j + size); ++k)
                     {
                         int new_to_rank = get_rank(k, image->actualHeight[i], nbProc, to_rank, true);
