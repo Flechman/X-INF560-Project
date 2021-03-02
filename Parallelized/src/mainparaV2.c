@@ -117,7 +117,7 @@ animated_gif *load_pixels(char *filename, int rank, int size)
             actualWidth[i] = g->SavedImages[i].ImageDesc.Width;
             actualHeight[i] = g->SavedImages[i].ImageDesc.Height;
             heightStart[i] = 0;
-            heightEnd[i] = round(1.0/(double)size * actualHeight[i]);
+            heightEnd[i] = round((double)actualHeight[i]/(double)size);
 
         #if SOBELF_DEBUG
             printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
@@ -292,12 +292,12 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
     double fractionImage = 1.0 / (double)size;
 
     if(rank != 0) {
-        double start = rank * fractionImage;
+        double start = (double)rank * fractionImage;
         double end = start + fractionImage;
 
         for(i = 0; i < n_images; ++i) {
-            heightStart[i] = round(start * actualHeight[i]);
-            heightEnd[i] = round(end * actualHeight[i]);
+            heightStart[i] = round(start * (double)actualHeight[i]);
+            heightEnd[i] = round(end * (double)actualHeight[i]);
 
             int width = actualWidth[i];
             int height = heightEnd[i] - heightStart[i];
@@ -317,8 +317,8 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
         if(rank == 0) {
             //Send to every process its pixels
             for(j = 1; j < size; ++j) {
-                int startIndex = round(j * fractionImage * actualHeight[i]);
-                int endIndex = round((j+1) * fractionImage * actualHeight[i]);
+                int startIndex = round((double)j * fractionImage * (double)actualHeight[i]);
+                int endIndex = round((double)(j+1) * fractionImage * (double)actualHeight[i]);
                 int height = endIndex - startIndex;
                 int rowLength = actualWidth[i] * 3;
                 int *data = malloc(rowLength * height * sizeof(int));
