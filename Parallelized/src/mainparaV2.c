@@ -931,7 +931,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 {
                     /* Recv from previous process */
                     int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, image->heightStart[i] - 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     for (j = 0; j < size; ++j)
                     {
                         for (k = 0; k < width; ++k)
@@ -954,7 +954,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                             dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                         }
                     }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, image->heightStart[i], MPI_COMM_WORLD);
+                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
                     free(dataSend);
                 }
 
@@ -972,12 +972,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                             dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                         }
                     }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, image->heightEnd[i] - 1, MPI_COMM_WORLD);
+                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
                     free(dataSend);
 
                     /* Recv from next process */
                     int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, image->heightEnd[i], MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     for (j = 0; j < size; ++j)
                     {
                         for (k = 0; k < width; ++k)
@@ -1063,7 +1063,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 {
                     /* Recv from previous process */
                     int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, image->heightStart[i] - 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     for (j = 0; j < size; ++j)
                     {
                         for (k = 0; k < width; ++k)
@@ -1096,7 +1096,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                             }
                         }
                     }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, image->heightStart[i], MPI_COMM_WORLD);
+                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
                     free(dataSend);
                 }
 
@@ -1114,12 +1114,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                             dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                         }
                     }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, image->heightEnd[i] - 1, MPI_COMM_WORLD);
+                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
                     free(dataSend);
 
                     /* Recv from next process */
                     int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, image->heightEnd[i], MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     for (j = 0; j < size; ++j)
                     {
                         for (k = 0; k < width; ++k)
@@ -1212,9 +1212,9 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             }
 
             //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-            int *received_end = malloc((nbProc - 1) * sizeof(int));
-            MPI_Allgather(&end, 1, MPI_INTEGER, received_end, (nbProc - 1), MPI_INTEGER, MPI_COMM_WORLD);
-            for (j = 0; j < nbProc - 1; ++j)
+            int *received_end = malloc(nbProc * sizeof(int));
+            MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, MPI_COMM_WORLD);
+            for (j = 0; j < nbProc; ++j)
             {
                 if (received_end[j] == 0)
                 {
@@ -1222,12 +1222,11 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                 }
             }
             free(received_end);
-
         } while (threshold > 0 && !end);
 
-#if SOBELF_DEBUG
+        #if SOBELF_DEBUG
         printf("BLUR: number of iterations for image %d\n", n_iter);
-#endif
+        #endif
 
         free(new);
     }
@@ -1406,8 +1405,6 @@ int main(int argc, char **argv)
 
     printf("GIF loaded from file %s with %d image(s) in %lf s\n",
            input_filename, image->n_images, duration);
-
-    MPI_Barrier(MPI_COMM_WORLD);
 
     /*==============================================*/
     /*================= FILTER =====================*/
