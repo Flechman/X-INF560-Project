@@ -1227,16 +1227,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
             }
 
             //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-            int *received_end = malloc(nbProc * sizeof(int));
-            MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, MPI_COMM_WORLD);
-            for (j = 0; j < nbProc; ++j)
-            {
-                if (received_end[j] == 0)
+            if(color == 1) {
+                int *received_end = malloc(sizeToUse * sizeof(int));
+                MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
+                for (j = 0; j < sizeToUse; ++j)
                 {
-                    end = 0;
+                    if (received_end[j] == 0)
+                    {
+                        end = 0;
+                    }
                 }
+                free(received_end);
+            } else {
+                end = 0;
             }
-            free(received_end);
         } while (threshold > 0 && !end);
 
         MPI_Comm_free(&active_group);
