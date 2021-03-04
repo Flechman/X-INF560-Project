@@ -1,0 +1,22 @@
+
+set term postscript eps color 8
+set ytic auto
+
+SOBEL = "#433E3F"; LOAD = "#1D8A99"; EXPORT = "#655560"
+
+set autoscale y
+set boxwidth 0.9
+set style fill solid
+set style data histogram
+set style histogram cluster gap 1
+
+
+set ylabel "Latency (s)"
+set xlabel "Images"
+set xtics rotate by 45 right
+set title title_text
+
+set output output_file
+plot input_file using 3:xtic(6) title "Filters", '' u 4  title "Load", '' u 5  title "Export"
+set output
+quit
