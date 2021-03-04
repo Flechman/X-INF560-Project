@@ -13,6 +13,7 @@
 
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
+#define PROFILING 0
 
 /* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
 #define TWO_D_TO_ONE_D(l, c, nb_c) \
@@ -43,6 +44,7 @@ typedef struct animated_gif
 int min(int a, int b) { return (a < b) ? a : b; }
 int max(int a, int b) { return (a > b) ? a : b; }
 
+/* Auxiliary method to limit the number of processors working if necessary */
 int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius) {
     int sizeToUse = size;
     int minHeightPerProcess = actualHeight / size;
@@ -1433,6 +1435,10 @@ int main(int argc, char **argv)
     printf("GIF loaded from file %s with %d image(s) in %lf s\n",
            input_filename, image->n_images, duration);
 
+    #if PROFILING
+    MPI_Barrier(MPI_COMM_WORLD);
+    #endif
+
     /*==============================================*/
     /*================= FILTER =====================*/
 
@@ -1454,6 +1460,10 @@ int main(int argc, char **argv)
     duration = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
 
     printf("SOBEL done in %lf s\n", duration);
+
+    #if PROFILING
+    MPI_Barrier(MPI_COMM_WORLD);
+    #endif
 
     /*==============================================*/
 
