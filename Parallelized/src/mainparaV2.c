@@ -1354,6 +1354,8 @@ int main(int argc, char **argv)
 {
 
     int rank, size;
+    int blur_radius = 5;
+    int blur_threshold = 20;
 
     /* MPI Initialization */
     MPI_Init(&argc, &argv);
@@ -1415,7 +1417,7 @@ int main(int argc, char **argv)
     apply_gray_filter(image, rank, size);
 
     /* Apply blur filter with convergence value */
-    apply_blur_filter(image, 5, 20, rank, size);
+    apply_blur_filter(image, blur_radius, blur_threshold, rank, size);
 
     /* Apply sobel filter on pixels */
     apply_sobel_filter(image, rank, size);
