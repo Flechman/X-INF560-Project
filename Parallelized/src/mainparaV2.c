@@ -919,315 +919,315 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
         int color = (rank < sizeToUse) ? 1 : 0;
         MPI_Comm_split(MPI_COMM_WORLD, color, rank, &active_group);
 
-        /* Perform at least one blur iteration */
-        do
-        {
-            end = 1;
-            n_iter++;
-
-            int heightEnd = (image->heightEnd[i] >= (image->actualHeight[i] - 1)) ? image->actualHeight[i] - 1 : image->heightEnd[i];
-            for (j = image->heightStart[i]; j < heightEnd; j++)
+        if(rank < sizeToUse) {
+            /* Perform at least one blur iteration */
+            do
             {
-                for (k = 0; k < width - 1; k++)
+                end = 1;
+                n_iter++;
+
+                int heightEnd = (image->heightEnd[i] >= (image->actualHeight[i] - 1)) ? image->actualHeight[i] - 1 : image->heightEnd[i];
+                for (j = image->heightStart[i]; j < heightEnd; j++)
                 {
-                    int j2 = j - image->heightStart[i];
-                    new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                    new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                    new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-                }
-            }
-
-            /* First 10% of the image */
-            if (image->heightStart[i] < image->actualHeight[i] / 10 && rank < sizeToUse)
-            {
-                pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
-                pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
-
-                if (image->heightStart[i] > 0)
-                {
-                    /* Recv from previous process */
-                    int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (j = 0; j < size; ++j)
+                    for (k = 0; k < width - 1; k++)
                     {
-                        for (k = 0; k < width; ++k)
-                        {
-                            pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-                            receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-                        }
-                    }
-                    free(dataRecv);
-
-                    /* Send to previous process */
-                    int *dataSend = malloc(size * width * 3 * sizeof(int));
-                    for (j = 0; j < size; ++j)
-                    {
-                        for (k = 0; k < width; ++k)
-                        {
-                            dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
-                            dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
-                            dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
-                        }
-                    }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-                    free(dataSend);
-                }
-
-                if (image->heightEnd[i] < image->actualHeight[i] / 10)
-                {
-                    /* Send to next process */
-                    int *dataSend = malloc(size * width * 3 * sizeof(int));
-                    for (j = 0; j < size; ++j)
-                    {
-                        for (k = 0; k < width; ++k)
-                        {
-                            int j2 = j + height - size;
-                            dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                            dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                            dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-                        }
-                    }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-                    free(dataSend);
-
-                    /* Recv from next process */
-                    int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (j = 0; j < size; ++j)
-                    {
-                        for (k = 0; k < width; ++k)
-                        {
-                            pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-                            receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-                        }
-                    }
-                    free(dataRecv);
-                }
-
-                /* Compute blur */
-                int heightStartLocal = max(size, image->heightStart[i]);
-                int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
-                for (j = heightStartLocal; j < heightEndLocal; ++j)
-                {
-                    for (k = size; k < width - size; k++)
-                    {
-                        int stencil_j, stencil_k;
-                        int t_r = 0;
-                        int t_g = 0;
-                        int t_b = 0;
-                        for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-                        {
-                            if (j + stencil_j < image->heightStart[i])
-                            {
-                                int j2 = size - (image->heightStart[i] - j - stencil_j);
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
-                            }
-                            else if (j + stencil_j >= image->heightEnd[i])
-                            {
-                                int j2 = j + stencil_j - image->heightEnd[i];
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
-                            }
-                            else
-                            {
-                                int j2 = j + stencil_j - image->heightStart[i];
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
-                            }
-                        }
                         int j2 = j - image->heightStart[i];
-                        new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-                        new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-                        new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+                        new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                     }
                 }
-            }
 
-            /* Copy the middle part of the image */
-            for (j = max(image->actualHeight[i] / 10 - size, image->heightStart[i]); j < min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size); ++j)
-            {
-                int j2 = j - image->heightStart[i];
-                for (k = size; k < width - size; ++k)
+                /* First 10% of the image */
+                if (image->heightStart[i] < image->actualHeight[i] / 10)
                 {
-                    new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                    new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                    new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-                }
-            }
+                    pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
+                    pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
 
-            /* Last 10% of the image */
-            if (image->heightEnd[i] > image->actualHeight[i] * 0.9 && rank < sizeToUse)
-            {
-                pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
-                pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
-
-                if (image->heightStart[i] > image->actualHeight[i] * 0.9)
-                {
-                    /* Recv from previous process */
-                    int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (j = 0; j < size; ++j)
+                    if (image->heightStart[i] > 0)
                     {
-                        for (k = 0; k < width; ++k)
+                        /* Recv from previous process */
+                        int *dataRecv = malloc(size * width * 3 * sizeof(int));
+                        MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        for (j = 0; j < size; ++j)
                         {
-                            pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-                            receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-                        }
-                    }
-                    free(dataRecv);
-
-                    /* Send to previous process */
-                    //BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
-                    int *dataSend = malloc(size * width * 3 * sizeof(int));
-                    for (j = 0; j < size; ++j)
-                    {
-                        int j2 = j + image->heightStart[i];
-                        for (k = 0; k < width; ++k)
-                        {
-                            if (j2 >= image->actualHeight[i])
+                            for (k = 0; k < width; ++k)
                             {
-                                dataSend[j * width * 3 + k] = 0;
-                                dataSend[j * width * 3 + k + width] = 0;
-                                dataSend[j * width * 3 + k + 2 * width] = 0;
+                                pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+                                receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
                             }
-                            else
+                        }
+                        free(dataRecv);
+
+                        /* Send to previous process */
+                        int *dataSend = malloc(size * width * 3 * sizeof(int));
+                        for (j = 0; j < size; ++j)
+                        {
+                            for (k = 0; k < width; ++k)
                             {
                                 dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
                                 dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
                                 dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
                             }
                         }
+                        MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+                        free(dataSend);
                     }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-                    free(dataSend);
-                }
 
-                if (image->heightEnd[i] < image->actualHeight[i])
-                {
-                    /* Send to next process */
-                    int *dataSend = malloc(size * width * 3 * sizeof(int));
-                    for (j = 0; j < size; ++j)
+                    if (image->heightEnd[i] < image->actualHeight[i] / 10)
                     {
-                        for (k = 0; k < width; ++k)
+                        /* Send to next process */
+                        int *dataSend = malloc(size * width * 3 * sizeof(int));
+                        for (j = 0; j < size; ++j)
                         {
-                            int j2 = j + height - size;
-                            dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                            dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                            dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-                        }
-                    }
-                    MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-                    free(dataSend);
-
-                    /* Recv from next process */
-                    int *dataRecv = malloc(size * width * 3 * sizeof(int));
-                    MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                    for (j = 0; j < size; ++j)
-                    {
-                        for (k = 0; k < width; ++k)
-                        {
-                            pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-                            receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-                        }
-                    }
-                    free(dataRecv);
-                }
-
-                /* Compute blur */
-                int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
-                int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
-                for (j = heightStartLocal; j < heightEndLocal; j++)
-                {
-                    for (k = size; k < width - size; k++)
-                    {
-                        int stencil_j, stencil_k;
-                        int t_r = 0;
-                        int t_g = 0;
-                        int t_b = 0;
-                        for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-                        {
-                            if (j + stencil_j < image->heightStart[i])
+                            for (k = 0; k < width; ++k)
                             {
-                                int j2 = size - (image->heightStart[i] - j - stencil_j);
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
-                            }
-                            else if (j + stencil_j >= image->heightEnd[i])
-                            {
-                                int j2 = j + stencil_j - image->heightEnd[i];
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
-                            }
-                            else
-                            {
-                                int j2 = j + stencil_j - image->heightStart[i];
-                                for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-                                {
-                                    t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-                                    t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-                                    t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-                                }
+                                int j2 = j + height - size;
+                                dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                                dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                                dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
                             }
                         }
-                        int j2 = j - image->heightStart[i];
-                        new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-                        new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-                        new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+                        MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
+                        free(dataSend);
+
+                        /* Recv from next process */
+                        int *dataRecv = malloc(size * width * 3 * sizeof(int));
+                        MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        for (j = 0; j < size; ++j)
+                        {
+                            for (k = 0; k < width; ++k)
+                            {
+                                pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+                                receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+                            }
+                        }
+                        free(dataRecv);
                     }
-                }
-            }
 
-            int jBound = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-            for (j = max(1, image->heightStart[i]); j < jBound; j++)
-            {
-                int j2 = j - image->heightStart[i];
-                for (k = 1; k < width - 1; k++)
-                {
-
-                    float diff_r;
-                    float diff_g;
-                    float diff_b;
-
-                    diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
-                    diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
-                    diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
-
-                    if (diff_r > threshold || -diff_r > threshold ||
-                        diff_g > threshold || -diff_g > threshold ||
-                        diff_b > threshold || -diff_b > threshold)
+                    /* Compute blur */
+                    int heightStartLocal = max(size, image->heightStart[i]);
+                    int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
+                    for (j = heightStartLocal; j < heightEndLocal; ++j)
                     {
-                        end = 0;
+                        for (k = size; k < width - size; k++)
+                        {
+                            int stencil_j, stencil_k;
+                            int t_r = 0;
+                            int t_g = 0;
+                            int t_b = 0;
+                            for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+                            {
+                                if (j + stencil_j < image->heightStart[i])
+                                {
+                                    int j2 = size - (image->heightStart[i] - j - stencil_j);
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                                else if (j + stencil_j >= image->heightEnd[i])
+                                {
+                                    int j2 = j + stencil_j - image->heightEnd[i];
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                                else
+                                {
+                                    int j2 = j + stencil_j - image->heightStart[i];
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                            }
+                            int j2 = j - image->heightStart[i];
+                            new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+                            new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+                            new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+                        }
+                    }
+                }
+
+                /* Copy the middle part of the image */
+                for (j = max(image->actualHeight[i] / 10 - size, image->heightStart[i]); j < min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size); ++j)
+                {
+                    int j2 = j - image->heightStart[i];
+                    for (k = size; k < width - size; ++k)
+                    {
+                        new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                        new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                        new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                    }
+                }
+
+                /* Last 10% of the image */
+                if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
+                {
+                    pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
+                    pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
+
+                    if (image->heightStart[i] > image->actualHeight[i] * 0.9)
+                    {
+                        /* Recv from previous process */
+                        int *dataRecv = malloc(size * width * 3 * sizeof(int));
+                        MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        for (j = 0; j < size; ++j)
+                        {
+                            for (k = 0; k < width; ++k)
+                            {
+                                pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+                                receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+                            }
+                        }
+                        free(dataRecv);
+
+                        /* Send to previous process */
+                        //BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
+                        int *dataSend = malloc(size * width * 3 * sizeof(int));
+                        for (j = 0; j < size; ++j)
+                        {
+                            int j2 = j + image->heightStart[i];
+                            for (k = 0; k < width; ++k)
+                            {
+                                if (j2 >= image->actualHeight[i])
+                                {
+                                    dataSend[j * width * 3 + k] = 0;
+                                    dataSend[j * width * 3 + k + width] = 0;
+                                    dataSend[j * width * 3 + k + 2 * width] = 0;
+                                }
+                                else
+                                {
+                                    dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
+                                    dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
+                                    dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
+                                }
+                            }
+                        }
+                        MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+                        free(dataSend);
                     }
 
-                    p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
-                    p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
-                    p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
-                }
-            }
+                    if (image->heightEnd[i] < image->actualHeight[i])
+                    {
+                        /* Send to next process */
+                        int *dataSend = malloc(size * width * 3 * sizeof(int));
+                        for (j = 0; j < size; ++j)
+                        {
+                            for (k = 0; k < width; ++k)
+                            {
+                                int j2 = j + height - size;
+                                dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+                                dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+                                dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                            }
+                        }
+                        MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
+                        free(dataSend);
 
-            //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-            if(color == 1) {
+                        /* Recv from next process */
+                        int *dataRecv = malloc(size * width * 3 * sizeof(int));
+                        MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        for (j = 0; j < size; ++j)
+                        {
+                            for (k = 0; k < width; ++k)
+                            {
+                                pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+                                receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+                            }
+                        }
+                        free(dataRecv);
+                    }
+
+                    /* Compute blur */
+                    int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
+                    int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
+                    for (j = heightStartLocal; j < heightEndLocal; j++)
+                    {
+                        for (k = size; k < width - size; k++)
+                        {
+                            int stencil_j, stencil_k;
+                            int t_r = 0;
+                            int t_g = 0;
+                            int t_b = 0;
+                            for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+                            {
+                                if (j + stencil_j < image->heightStart[i])
+                                {
+                                    int j2 = size - (image->heightStart[i] - j - stencil_j);
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                                else if (j + stencil_j >= image->heightEnd[i])
+                                {
+                                    int j2 = j + stencil_j - image->heightEnd[i];
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                                else
+                                {
+                                    int j2 = j + stencil_j - image->heightStart[i];
+                                    for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+                                    {
+                                        t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+                                        t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+                                        t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+                                    }
+                                }
+                            }
+                            int j2 = j - image->heightStart[i];
+                            new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+                            new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+                            new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+                        }
+                    }
+                }
+
+                int jBound = min(image->actualHeight[i] - 1, image->heightEnd[i]);
+                for (j = max(1, image->heightStart[i]); j < jBound; j++)
+                {
+                    int j2 = j - image->heightStart[i];
+                    for (k = 1; k < width - 1; k++)
+                    {
+
+                        float diff_r;
+                        float diff_g;
+                        float diff_b;
+
+                        diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
+                        diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
+                        diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
+
+                        if (diff_r > threshold || -diff_r > threshold ||
+                            diff_g > threshold || -diff_g > threshold ||
+                            diff_b > threshold || -diff_b > threshold)
+                        {
+                            end = 0;
+                        }
+
+                        p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
+                        p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
+                        p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
+                    }
+                }
+
+                //CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
                 int *received_end = malloc(sizeToUse * sizeof(int));
                 MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
                 for (j = 0; j < sizeToUse; ++j)
@@ -1238,10 +1238,8 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     }
                 }
                 free(received_end);
-            } else {
-                end = 0;
-            }
-        } while (threshold > 0 && !end);
+            } while (threshold > 0 && !end);
+        }
 
         MPI_Comm_free(&active_group);
 
