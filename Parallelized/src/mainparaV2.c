@@ -293,7 +293,7 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size) {
 
     if(rank != 0) {
         double start = (double)rank * fractionImage;
-        double end = start + fractionImage;
+        double end = (double)(rank + 1) * fractionImage;
 
         for(i = 0; i < n_images; ++i) {
             heightStart[i] = round(start * (double)actualHeight[i]);
