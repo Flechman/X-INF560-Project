@@ -907,7 +907,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
     /* Process all images */
     for (i = 0; i < image->n_images; i++)
     {
-        sizeToUse = compute_nb_proc_to_use(size, image->actualHeight[i], blur_radius);
+        sizeToUse = compute_nb_proc_to_use(nbProc, image->actualHeight[i], blur_radius);
         n_iter = 0;
         width = image->actualWidth[i];
         height = image->heightEnd[i] - image->heightStart[i];
