@@ -1078,9 +1078,9 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     int *dataSend = malloc(size * width * 3 * sizeof(int));
                     for (j = 0; j < size; ++j)
                     {
+                        int j2 = j + image->heightStart[i];
                         for (k = 0; k < width; ++k)
                         {
-                            int j2 = j + image->heightStart[i];
                             if (j2 >= image->actualHeight[i])
                             {
                                 dataSend[j * width * 3 + k] = 0;
@@ -1089,9 +1089,9 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                             }
                             else
                             {
-                                dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-                                dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-                                dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+                                dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
+                                dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
+                                dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
                             }
                         }
                     }
@@ -1107,7 +1107,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
                     {
                         for (k = 0; k < width; ++k)
                         {
-                            int j2 = j + image->heightEnd[i] - size;
+                            int j2 = j + height - size;
                             dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
                             dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
                             dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
