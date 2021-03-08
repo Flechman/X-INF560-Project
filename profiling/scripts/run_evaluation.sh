@@ -143,6 +143,31 @@ profiler()
 
 multiprofiler()
 {
+	if [[ $# == 0 ]];
+	then
+		echo "Oops! No script"
+		echo "Try './$(basename $0) -h' or './$(basename $0) --help' for more details"
+		return $(())
+	elif [[ $# == 1 ]];
+	then
+		case $1 in
+			("--help") 
+				printf "\t[-s|--script] -> Your script\n"
+				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
+				printf "\t[-t|--title] -> Title of graph\n"
+				printf "\t[-g|--graph_type] -> Graph type\n"
+				return $(())
+				;;
+			("-h") 
+				printf "\t[-s|--script] -> Your script\n"
+				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
+				printf "\t[-t|--title] -> Title of graph\n"
+				printf "\t[-g|--graph_type] -> Graph type\n"
+				return $(())
+				;;
+		esac
+	fi
+
 	local array=($@)
 
 	for ((index=0; index < $#-1; index++));
