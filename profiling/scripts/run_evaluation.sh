@@ -152,17 +152,15 @@ multiprofiler()
 	then
 		case $1 in
 			("--help") 
-				printf "\t[-s|--script] -> Your script\n"
-				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
-				printf "\t[-t|--title] -> Title of graph\n"
-				printf "\t[-g|--graph_type] -> Graph type\n"
+				printf "\t[-s] -> Your script\n"
+				printf "\t[-p] -> Number of processes. Three (3) arguments separated by ','. First is the start of the range, second is the increment, and last is the end of the range\n"
+				printf "\t[-n] -> Number of threads. Three (3) arguments separated by ','. First is the start of the range, second is the increment, and last is the end of the range\n"
 				return $(())
 				;;
 			("-h") 
-				printf "\t[-s|--script] -> Your script\n"
-				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
-				printf "\t[-t|--title] -> Title of graph\n"
-				printf "\t[-g|--graph_type] -> Graph type\n"
+				printf "\t[-s] -> Your script\n"
+				printf "\t[-p] -> Number of processes. Three (3) arguments separated by ','. First is the start of the range, second is the increment, and last is the end of the range\n"
+				printf "\t[-n] -> Number of threads. Three (3) arguments separated by ','. First is the start of the range, second is the increment, and last is the end of the range\n"
 				return $(())
 				;;
 		esac

@@ -1,7 +1,6 @@
 #!/bin/bash
 
+PROFILER_FILEPATH=/users/eleves-b/2020/kwabena.amponsem-boateng/INF560/X-INF560-Project/profiling/scripts
+source "${PROFILER_FILEPATH}/run_evaluation.sh"
 
-PROFILER_FILEPATH=$(dirname $(realpath $HOME/INF560/X-INF560-Project/profiling/scripts/run_evaluation.sh))
-source $PROFILER_FILEPATH/run_evaluation.sh
-export PATH=$PROFILER_FILEPATH:$PATH
 
