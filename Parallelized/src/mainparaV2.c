@@ -1014,7 +1014,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					int heightStartLocal = max(size, image->heightStart[i]);
 					int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
 					gettimeofday(&t1, NULL);
-#pragma omp parallel for private(k,j) default(none) shared(width,i,p, size, image, new, receivedTopPart, receivedBottomPart, heightStartLocal, heightEndLocal)
+#pragma omp parallel for schedule(static) private(k,j) default(none) shared(width,i,p, size, image, new, receivedTopPart, receivedBottomPart, heightStartLocal, heightEndLocal)
 					for (j = heightStartLocal; j < heightEndLocal; ++j)
 					{
 						for (k = size; k < width - size; k++)
@@ -1170,7 +1170,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
 					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
 					gettimeofday(&t1, NULL);
-#pragma omp parallel for private(k,j) default(none) shared(width,i,p, size, image, new, receivedTopPart, receivedBottomPart, heightStartLocal, heightEndLocal)
+#pragma omp parallel for schedule(static) private(k,j) default(none) shared(width,i,p, size, image, new, receivedTopPart, receivedBottomPart, heightStartLocal, heightEndLocal)
 					for (j = heightStartLocal; j < heightEndLocal; j++)
 					{
 						for (k = size; k < width - size; k++)
