@@ -194,7 +194,7 @@ multiprofiler()
 	local MULTI="multi"
 	local RESULTS_FILES_LIST=()
 	local TITLES=()
-	local PLOTTER_DIR=$HOME/INF560/X-INF560-Project/profiling/scripts
+	local PLOTTER_DIR=$HOME/X-INF560-Project/profiling/scripts
 	local PLOTTER_FILE=evaluation-multi.plg
 	local PLOTTER=$(realpath $PLOTTER_DIR)/$PLOTTER_FILE
 
