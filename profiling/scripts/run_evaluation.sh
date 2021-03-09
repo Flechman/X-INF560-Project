@@ -83,7 +83,7 @@ profiler()
 	# Variables
 	CMD_DIR=$(dirname $(realpath $CMD))
 	CMD_BASENAME=./$(basename $CMD)
-	PLOTTER_DIR=$HOME/INF560/X-INF560-Project/profiling/scripts
+	PLOTTER_DIR=$HOME/X-INF560-Project/profiling/scripts
 	PLOTTER=$(realpath $PLOTTER_DIR)/$PLOTTER_FILE
 	EVAL="eval"
 	local RESULTS="RESULTS_"${CMD_ARG// /,}"_"$TITLE_TEXT"_"$GRAPH_TYPE".dat"
