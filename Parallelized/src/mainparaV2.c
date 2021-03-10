@@ -14,7 +14,7 @@
 
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
-#define PROFILING 0
+#define PROFILING 1
 
 /* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
 #define TWO_D_TO_ONE_D(l, c, nb_c) \
@@ -941,11 +941,13 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 				/* Perform at least one blur iteration */
 				do
 				{
+					#pragma omp barrier
 					#pragma omp master 
 					{
 						end = 1;
 						n_iter++;
 					}
+					#pragma omp barrier
 
 					#pragma omp for schedule(static)
 					for (k = 0; k < width - 1; k++) 
@@ -965,10 +967,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 						if (image->heightStart[i] > 0)
 						{
 							/* Recv from previous process */
-							#pragma omp single 
+							#pragma omp barrier
+							#pragma omp master 
 							{
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
+							#pragma omp barrier
 							#pragma omp for schedule(static)
 							for (k = 0; k < width; ++k)
 							{
@@ -991,10 +995,11 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 								}
 							}
 							#pragma omp barrier
-							#pragma omp single
+							#pragma omp master
 							{
 								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
 							}
+							#pragma omp barrier
 						}
 
 						if (image->heightEnd[i] < image->actualHeight[i] / 10)
@@ -1018,10 +1023,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							}
 
 							/* Recv from next process */
-							#pragma omp single
+							#pragma omp barrier
+							#pragma omp master
 							{
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
+							#pragma omp barrier
 							#pragma omp for schedule(static)
 							for (k = 0; k < width; ++k)
 							{
@@ -1109,10 +1116,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 						if (image->heightStart[i] > image->actualHeight[i] * 0.9)
 						{
 							/* Recv from previous process */
-							#pragma omp single
+							#pragma omp barrier
+							#pragma omp master
 							{
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
+							#pragma omp barrier
 							#pragma omp for schedule(static)
 							for (k = 0; k < width; ++k)
 							{
@@ -1145,10 +1154,11 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 								}
 							}
 							#pragma omp barrier
-							#pragma omp single
+							#pragma omp master
 							{
 								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
 							}
+							#pragma omp barrier
 						}
 
 						if (image->heightEnd[i] < image->actualHeight[i])
@@ -1172,10 +1182,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							}
 
 							/* Recv from next process */
-							#pragma omp single
+							#pragma omp barrier
+							#pragma omp master
 							{
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
+							#pragma omp barrier
 							#pragma omp for schedule(static)
 							for (k = 0; k < width; ++k)
 							{
@@ -1274,7 +1286,8 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 
 					//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-					#pragma omp single 
+					#pragma omp barrier
+					#pragma omp master
 					{
 						int *received_end = malloc(sizeToUse * sizeof(int));
 						MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
@@ -1287,6 +1300,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 						}
 						free(received_end);
 					}
+					#pragma omp barrier
 				} while (threshold > 0 && !end);
 			} //END OF OMP PARALLEL
 		}
