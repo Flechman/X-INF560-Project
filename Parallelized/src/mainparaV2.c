@@ -917,6 +917,8 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 
 		/* Allocate array of new pixels */
 		new = (pixel *)malloc(width * height * sizeof(pixel));
+		pixel *receivedTopPart, *receivedBottomPart;
+		int *dataRecv, *dataSend; 
 
 		MPI_Comm active_group;
 		int color = (rank < sizeToUse) ? 1 : 0;
@@ -924,18 +926,25 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 
 		if(rank < sizeToUse) {
 
-			#pragma omp parallel default(none) private(j, k) shared(i, width, height, sizeToUse, n_iter, new, p, color, end, size, threshold, rank, nbProc, blur_radius) {
-			/* Perform at least one blur iteration */
-			do
+#pragma omp parallel default(none) private(j, k, receivedTopPart, receivedBottomPart, dataSend, dataRecv) \
+			shared(ompi_mpi_comm_world, active_group, ompi_mpi_integer, i, \
+					width, height, sizeToUse, n_iter, new, p, color,\
+					end, size, threshold, rank, nbProc, blur_radius, \
+					image \
+			      ) 
 			{
-				#pragma omp master {
-					end = 1;
-					n_iter++;
-				}
+				/* Perform at least one blur iteration */
+				do
+				{
+#pragma omp master 
+					{
+						end = 1;
+						n_iter++;
+					}
 
-				int heightEnd = (image->heightEnd[i] >= (image->actualHeight[i] - 1)) ? image->actualHeight[i] - 1 : image->heightEnd[i];
+					int heightEnd = (image->heightEnd[i] >= (image->actualHeight[i] - 1)) ? image->actualHeight[i] - 1 : image->heightEnd[i];
 
-				#pragma omp for schedule(static) {
+#pragma omp for schedule(static) 
 					for (k = 0; k < width - 1; k++) 
 					{
 						for (j = image->heightStart[i]; j < heightEnd; j++) 
@@ -946,24 +955,26 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 						}
 					}
-				}
 
-				/* First 10% of the image */
-				if (image->heightStart[i] < image->actualHeight[i] / 10)
-				{
-					#pragma omp master {
-						pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
-						pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
-					}
 
-					if (image->heightStart[i] > 0)
+					/* First 10% of the image */
+					if (image->heightStart[i] < image->actualHeight[i] / 10)
 					{
-						/* Recv from previous process */
-						#pragma omp single {
-							int *dataRecv = malloc(size * width * 3 * sizeof(int));
-							MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+#pragma omp master 
+						{
+							receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
+							receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
 						}
-						#pragma omp for schedule(static) {
+
+						if (image->heightStart[i] > 0)
+						{
+							/* Recv from previous process */
+#pragma omp single 
+							{
+								dataRecv = malloc(size * width * 3 * sizeof(int));
+								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -972,17 +983,19 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp single {
-							free(dataRecv);
-						}
 
-						/* Send to previous process */
-						#pragma omp single {
-							int *dataSend = malloc(size * width * 3 * sizeof(int));
-						}
-						#pragma omp for schedule(static) {
+#pragma omp barrier
+#pragma omp single 
+							{
+								free(dataRecv);
+							}
+
+							/* Send to previous process */
+#pragma omp single
+							{
+								dataSend = malloc(size * width * 3 * sizeof(int));
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -992,21 +1005,23 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp master {
-							MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-							free(dataSend);
-						}
-					}
 
-					if (image->heightEnd[i] < image->actualHeight[i] / 10)
-					{
-						/* Send to next process */
-						#pragma omp single {
-							int *dataSend = malloc(size * width * 3 * sizeof(int));
+#pragma omp barrier
+#pragma omp master 
+							{
+								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+								free(dataSend);
+							}
 						}
-						#pragma omp for schedule(static) {
+
+						if (image->heightEnd[i] < image->actualHeight[i] / 10)
+						{
+							/* Send to next process */
+#pragma omp single 
+							{
+								dataSend = malloc(size * width * 3 * sizeof(int));
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1015,19 +1030,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g; dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp master {
-							MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-							free(dataSend);
-						}
+#pragma omp barrier
+#pragma omp master 
+							{
+								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
+								free(dataSend);
+							}
 
-						/* Recv from next process */
-						#pragma omp single {
-							int *dataRecv = malloc(size * width * 3 * sizeof(int));
-							MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-						}
-						#pragma omp for schedule(static) {
+							/* Recv from next process */
+#pragma omp single 
+							{
+								dataRecv = malloc(size * width * 3 * sizeof(int));
+								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1036,18 +1052,19 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp single {
-							free(dataRecv);
-						}
-					}
 
-					/* Compute blur */
-					int heightStartLocal = max(size, image->heightStart[i]);
-					int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
+#pragma omp barrier
+#pragma omp single 
+							{
+								free(dataRecv);
+							}
+						}
 
-					#pragma omp for schedule(static) {
+						/* Compute blur */
+						int heightStartLocal = max(size, image->heightStart[i]);
+						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
+
+#pragma omp for schedule(static) 
 						for (k = size; k < width - size; k++)
 						{
 							for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1096,12 +1113,11 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							}
 						}
 					}
-				}
 
-				int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
-				int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
-				/* Copy the middle part of the image */
-				#pragma omp for schedule(static) {
+					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
+					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
+					/* Copy the middle part of the image */
+#pragma omp for schedule(static) 
 					for (k = size; k < width - size; ++k)
 					{
 						for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1112,24 +1128,25 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 						}
 					}
-				}
 
-				/* Last 10% of the image */
-				if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
-				{
-					#pragma omp master {
-						pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
-						pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
-					}
-
-					if (image->heightStart[i] > image->actualHeight[i] * 0.9)
+					/* Last 10% of the image */
+					if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
 					{
-						/* Recv from previous process */
-						#pragma omp single {
-							int *dataRecv = malloc(size * width * 3 * sizeof(int));
-							MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+#pragma omp master 
+						{
+							pixel *receivedTopPart = (pixel *)malloc(size * width * sizeof(pixel));
+							pixel *receivedBottomPart = (pixel *)malloc(size * width * sizeof(pixel));
 						}
-						#pragma omp for schedule(static) {
+
+						if (image->heightStart[i] > image->actualHeight[i] * 0.9)
+						{
+							/* Recv from previous process */
+#pragma omp single 
+							{
+								dataRecv = malloc(size * width * 3 * sizeof(int));
+								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1138,18 +1155,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp single {
-							free(dataRecv);
-						}
 
-						/* Send to previous process */
-						//BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
-						#pragma omp single {
-							int *dataSend = malloc(size * width * 3 * sizeof(int));
-						}
-						#pragma omp for schedule(static) {
+#pragma omp barrier
+#pragma omp single 
+							{
+								free(dataRecv);
+							}
+
+							/* Send to previous process */
+							//BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
+#pragma omp single 
+							{
+								dataSend = malloc(size * width * 3 * sizeof(int));
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1168,21 +1187,22 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									}
 								}
 							}
+#pragma omp barrier
+#pragma omp master 
+							{
+								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+								free(dataSend);
+							}
 						}
-						#pragma omp barrier
-						#pragma omp master {
-							MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-							free(dataSend);
-						}
-					}
 
-					if (image->heightEnd[i] < image->actualHeight[i])
-					{
-						/* Send to next process */
-						#pragma omp single {
-							int *dataSend = malloc(size * width * 3 * sizeof(int));
-						}
-						#pragma omp for schedule(static) {
+						if (image->heightEnd[i] < image->actualHeight[i])
+						{
+							/* Send to next process */
+#pragma omp single 
+							{
+								dataSend = malloc(size * width * 3 * sizeof(int));
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1193,19 +1213,21 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 								}
 							}
-						}
-						#pragma omp barrier
-						#pragma omp master {
-							MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-							free(dataSend);
-						}
 
-						/* Recv from next process */
-						#pragma omp single {
-							int *dataRecv = malloc(size * width * 3 * sizeof(int));
-							MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-						}
-						#pragma omp for schedule(static) {
+#pragma omp barrier
+#pragma omp master 
+							{
+								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
+								free(dataSend);
+							}
+
+							/* Recv from next process */
+#pragma omp single 
+							{
+								dataRecv = malloc(size * width * 3 * sizeof(int));
+								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+							}
+#pragma omp for schedule(static) 
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1214,18 +1236,18 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 								}
 							}
+#pragma omp barrier
+#pragma omp master 
+							{
+								free(dataRecv);
+							}
 						}
-						#pragma omp barrier
-						#pragma omp master {
-							free(dataRecv);
-						}
-					}
 
-					/* Compute blur */
-					int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
-					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
+						/* Compute blur */
+						int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
+						int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
 
-					#pragma omp for schedule(static) {
+#pragma omp for schedule(static) 
 						for (k = size; k < width - size; k++)
 						{
 							for (j = heightStartLocal; j < heightEndLocal; j++)
@@ -1273,12 +1295,12 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
 							}
 						}
-					}
-				}
 
-				int jBoundDown = max(1, image->heightStart[i]);
-				int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-				#pragma omp for schedule(static) {
+					}
+
+					int jBoundDown = max(1, image->heightStart[i]);
+					int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
+#pragma omp for schedule(static) 
 					for (k = 1; k < width - 1; k++)
 					{
 						for (j = jBoundDown; j < jBoundUp; j++)
@@ -1297,9 +1319,8 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 									diff_g > threshold || -diff_g > threshold ||
 									diff_b > threshold || -diff_b > threshold)
 							{
-								#pragma omp atomic write {
-									end = 0;
-								}
+#pragma omp atomic write 
+								end = 0;
 							}
 
 							p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
@@ -1307,22 +1328,24 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
 						}
 					}
-				}
 
-				//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-				#pragma omp single {
-					int *received_end = malloc(sizeToUse * sizeof(int));
-					MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
-					for (j = 0; j < sizeToUse; ++j)
+
+					int *received_end;
+					//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
+#pragma omp single 
 					{
-						if (received_end[j] == 0)
+						received_end = malloc(sizeToUse * sizeof(int));
+						MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
+						for (j = 0; j < sizeToUse; ++j)
 						{
-							end = 0;
+							if (received_end[j] == 0)
+							{
+								end = 0;
+							}
 						}
+						free(received_end);
 					}
-					free(received_end);
-				}
-			} while (threshold > 0 && !end);
+				} while (threshold > 0 && !end);
 			} //END OF OMP PARALLEL
 		}
 
