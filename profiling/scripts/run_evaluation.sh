@@ -249,10 +249,11 @@ multiprofiler()
 				$CMD_BASENAME $CMD_ARG | grep "OUTPUT" | awk '{printf("%s\t%s\t%s\t%s\t%s\t", $3, $12, $7, $17, $21); system("echo "$10"| cut --delimiter='/' -f 3")}' >> $RESULTS_FILE
 
 				# Sort file on filter time
-				sort --key=3 --numeric-sort "${RESULTS_FILE}" "${RESULTS_FILE}"
+				sort --key=3,3nr "${RESULTS_FILE}" --output="${RESULTS_FILE}"
 			fi
 
-			local highest=$(tail -n 1 $RESULTS_FILE | awk '{print $3}') 
+			mapfile -t -c 1 lines < $RESULTS_FILE
+			highest=$(echo ${lines[0]}| awk '{print $3}')
 			echo -e "p${i}t${j}\t${highest}" >> $THREADS_PROCESSES_INPUT_FILE
 			RESULTS_FILES_LIST+=($RESULTS_FILE)
 			TITLES+=("${i} Processes ${j} Threads")
@@ -266,10 +267,10 @@ multiprofiler()
 		gnuplot -e "files='${RESULTS_FILES_LIST[*]}'; output_file='${OUTPUT_FILE}'; title_text='${TITLE_TEXT}'; titles='${TITLES[*]}'" $PLOTTER 
 	fi
 
-	if [ -f "$THREADS_PROCESSES_INPUT_FILE" ];
+	if [ -f "$THREADS_PROCESSES_OUTPUT_FILE" ];
 	then
 		PLOTTER="${PLOTTER_DIR}/evaluation-procs-threads.plg"
-		gnuplot -e "input_file='${THREADS_PROCESSES_INPUT_FILE}'; output_file='${THREADS_PROCESSES_OUTPUT_FILE}';" $PLOTTER 
+		gnuplot -e "input_file='${THREADS_PROCESSES_INPUT_FILE}'; output_file='${THREADS_PROCESSES_OUTPUT_FILE}'; title_text='${TITLE_TEXT}'" $PLOTTER 
 	fi
 
 }

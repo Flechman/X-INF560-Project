@@ -5,16 +5,14 @@ set ytic auto
 unset label
 
 set autoscale y
-set boxwidth 0.4
 set style fill solid
 
 set ylabel "Latency (s)"
-set xlabel "Images"
+set xlabel "Processes and Threads (p_t_)"
 set xtics rotate by 45 right
 set title title_text
 
-set style line 1 lc rgb '#66C3FF';
 set output output_file
-plot input_file using 1:xtic(2) with lines lc rgb '#66C3FF'
+plot input_file using 2:xtic(1) w l
 set output
 quit
