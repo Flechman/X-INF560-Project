@@ -108,10 +108,10 @@ profiler()
 	RESULTS=$CMD_DIR/$EVAL/$RESULTS
 	OUTPUT=$CMD_DIR/$EVAL/$OUTPUT
 
-	if [ -f "$RESULTS" ];
-	then
-		echo -e "#IMAGE\tN_IMAGES\tSOBEL_TIME\tLOAD_TIME\tEXPORT_TIME\tIMAGE_FILE" >> $RESULTS 
-	fi
+	#if [ -f "$RESULTS" ];
+	#then
+	#echo -e "#IMAGE\t#N_IMAGES\t#SOBEL_TIME\t#LOAD_TIME\t#EXPORT_TIME\t#IMAGE_FILE" >> $RESULTS 
+	#fi
 
 
 	# Display script state
@@ -127,6 +127,9 @@ profiler()
 	if [ -f "$RESULTS" ];
 	then
 		$CMD_BASENAME $CMD_ARG | grep "OUTPUT" | awk '{printf("%s\t%s\t%s\t%s\t%s\t", $3, $12, $7, $17, $21); system("echo "$10"| cut --delimiter='/' -f 3")}' >> $RESULTS
+
+		# Sort file on filter time
+		sort --key=3 --numeric-sort "${RESULTS}" --output="${RESULTS}"
 	fi
 
 
@@ -140,6 +143,8 @@ profiler()
 	# Change to previous directory
 	cd "$OLDPWD"
 }
+
+
 
 multiprofiler()
 {
@@ -204,7 +209,9 @@ multiprofiler()
 
 
 	local RESULTS_FOLDER=$CMD_DIR/$EVAL/$MULTI
-	local OUTPUT_FILE="$RESULTS_FOLDER/RESULTS_MULTI_${PROCESSES// /,}_${THREADS// /,}.eps"
+	local OUTPUT_FILE="$RESULTS_FOLDER/RESULTS_MULTI_${PROCESSES// /,}_procs_${THREADS// /,}_threads.eps"
+	local THREADS_PROCESSES_OUTPUT_FILE="$(dirname "${OUTPUT_FILE}")/THREADS_PROCESSES_OUTPUT_FILE.eps"
+	local THREADS_PROCESSES_INPUT_FILE="$(dirname $THREADS_PROCESSES_OUTPUT_FILE)/THREADS_PROCESSES_INPUT_FILE.dat"
 
 	if [ -d "$RESULTS_FOLDER" ];
 	then
@@ -212,7 +219,9 @@ multiprofiler()
 	else
 		mkdir -p $RESULTS_FOLDER
 		touch $OUTPUT_FILE
+		touch $THREADS_PROCESSES_OUTPUT_FILE
 	fi
+
 	# Loop over processes and threads to run them and build result files
 	for i in `seq ${PROCESSES}`;
 	do
@@ -229,25 +238,39 @@ multiprofiler()
 			fi
 
 
-			if [ -f "$RESULTS_FILE" ];
-			then
-				echo -e  "#IMAGE\tN_IMAGES\tSOBEL_TIME\tLOAD_TIME\tEXPORT_TIME\tIMAGE_FILE" >> $RESULTS_FILE
-			fi
+			#if [ -f "$RESULTS_FILE" ];
+			#then
+			#echo -e  "#IMAGE\t#N_IMAGES\t#SOBEL_TIME\t#LOAD_TIME\t#EXPORT_TIME\t#IMAGE_FILE" >> $RESULTS_FILE
+			#fi
 
 			if [ -f "$RESULTS_FILE" ];
 			then
 				local CMD_ARG="${i} ${j}"
 				$CMD_BASENAME $CMD_ARG | grep "OUTPUT" | awk '{printf("%s\t%s\t%s\t%s\t%s\t", $3, $12, $7, $17, $21); system("echo "$10"| cut --delimiter='/' -f 3")}' >> $RESULTS_FILE
+
+				# Sort file on filter time
+				sort --key=3,3nr "${RESULTS_FILE}" --output="${RESULTS_FILE}"
 			fi
+
+			mapfile -t -c 1 lines < $RESULTS_FILE
+			highest=$(echo ${lines[0]}| awk '{print $3}')
+			echo -e "p${i}t${j}\t${highest}" >> $THREADS_PROCESSES_INPUT_FILE
 			RESULTS_FILES_LIST+=($RESULTS_FILE)
 			TITLES+=("${i} Processes ${j} Threads")
 		done
 	done
 
+
 	# Plot the graph from the data
 	if [ -f "$OUTPUT_FILE" ];
 	then
 		gnuplot -e "files='${RESULTS_FILES_LIST[*]}'; output_file='${OUTPUT_FILE}'; title_text='${TITLE_TEXT}'; titles='${TITLES[*]}'" $PLOTTER 
+	fi
+
+	if [ -f "$THREADS_PROCESSES_OUTPUT_FILE" ];
+	then
+		PLOTTER="${PLOTTER_DIR}/evaluation-procs-threads.plg"
+		gnuplot -e "input_file='${THREADS_PROCESSES_INPUT_FILE}'; output_file='${THREADS_PROCESSES_OUTPUT_FILE}'; title_text='${TITLE_TEXT}'" $PLOTTER 
 	fi
 
 }

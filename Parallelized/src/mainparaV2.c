@@ -931,374 +931,320 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 
 		if(rank < sizeToUse) {
 
-			#pragma omp parallel default(none) private(j, k) \
-			shared(ompi_mpi_comm_world, active_group, ompi_mpi_integer, i, \
-					width, height, sizeToUse, n_iter, new, p, color,\
-					end, size, threshold, rank, nbProc, blur_radius, \
-					image, heightEnd, receivedTopPart, receivedBottomPart, dataSend, dataRecv, stdout \
-			      ) 
+			/* Perform at least one blur iteration */
+			do
 			{
-				/* Perform at least one blur iteration */
-				do
-				{
-					#pragma omp master
-					{
-						end = 1;
-						n_iter++;
-					}
-					#pragma omp barrier
+				end = 1;
+				n_iter++;
 
-					#pragma omp for schedule(static) collapse(2)
-					for (k = 0; k < width - 1; k++) 
+				for (k = 0; k < width - 1; k++) 
+				{
+					for (j = image->heightStart[i]; j < heightEnd; j++) 
 					{
-						for (j = image->heightStart[i]; j < heightEnd; j++) 
+						int j2 = j - image->heightStart[i];
+						new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+						new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+						new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+					}
+				}
+
+				/* First 10% of the image */
+				if (image->heightStart[i] < image->actualHeight[i] / 10)
+				{
+					if (image->heightStart[i] > 0)
+					{
+						/* Recv from previous process */
+						MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+						for (k = 0; k < width; ++k)
 						{
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+							for (j = 0; j < size; ++j)
+							{
+								pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+								receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+							}
+						}
+
+						/* Send to previous process */
+						for (k = 0; k < width; ++k)
+						{
+							for (j = 0; j < size; ++j)
+							{
+								dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
+								dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
+								dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
+							}
+						}
+						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+
+					}
+
+					if (image->heightEnd[i] < image->actualHeight[i] / 10)
+					{
+						/* Send to next process */
+						for (k = 0; k < width; ++k)
+						{
+							for (j = 0; j < size; ++j)
+							{
+								int j2 = j + height - size;
+								dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+								dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+								dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+							}
+						}
+						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
+
+						/* Recv from next process */
+						MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						for (k = 0; k < width; ++k)
+						{
+							for (j = 0; j < size; ++j)
+							{
+								pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+								receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+							}
 						}
 					}
 
-					/* First 10% of the image */
-					if (image->heightStart[i] < image->actualHeight[i] / 10)
+					/* Compute blur */
+					int heightStartLocal = max(size, image->heightStart[i]);
+					int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
+#pragma omp parallel for schedule(static) collapse(2)
+					for (k = size; k < width - size; k++)
 					{
-						if (image->heightStart[i] > 0)
+						for (j = heightStartLocal; j < heightEndLocal; ++j)
 						{
-							/* Recv from previous process */
-							#pragma omp master 
+							int stencil_j, stencil_k;
+							int t_r = 0;
+							int t_g = 0;
+							int t_b = 0;
+							for (stencil_j = -size; stencil_j <= size; ++stencil_j)
 							{
-								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-							}
-							#pragma omp barrier
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
+								if (j + stencil_j < image->heightStart[i])
 								{
-									pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-									receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+									int j2 = size - (image->heightStart[i] - j - stencil_j);
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
+								}
+								else if (j + stencil_j >= image->heightEnd[i])
+								{
+									int j2 = j + stencil_j - image->heightEnd[i];
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
+								}
+								else
+								{
+									int j2 = j + stencil_j - image->heightStart[i];
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
 								}
 							}
+							int j2 = j - image->heightStart[i];
+							new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+							new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+							new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+						}
+					}
+				}
 
-							/* Send to previous process */
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
+				int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
+				int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
+				/* Copy the middle part of the image */
+				for (k = size; k < width - size; ++k)
+				{
+					for (j = heightStartLocal; j < heightEndLocal; ++j)
+					{
+						int j2 = j - image->heightStart[i];
+						new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+						new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+						new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+					}
+				}
+
+				/* Last 10% of the image */
+				if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
+				{
+					if (image->heightStart[i] > image->actualHeight[i] * 0.9)
+					{
+						/* Recv from previous process */
+						MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						for (k = 0; k < width; ++k)
+						{
+							for (j = 0; j < size; ++j)
 							{
-								for (j = 0; j < size; ++j)
+								pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+								receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
+							}
+						}
+
+						/* Send to previous process */
+						//BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
+						for (k = 0; k < width; ++k)
+						{
+							for (j = 0; j < size; ++j)
+							{
+								if (j + image->heightStart[i] >= image->actualHeight[i])
+								{
+									dataSend[j * width * 3 + k] = 0;
+									dataSend[j * width * 3 + k + width] = 0;
+									dataSend[j * width * 3 + k + 2 * width] = 0;
+								}
+								else
 								{
 									dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
 									dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
 									dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
 								}
 							}
-							#pragma omp master
-							{
-								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-							}
-							#pragma omp barrier
 						}
+						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
+					}
 
-						if (image->heightEnd[i] < image->actualHeight[i] / 10)
+					if (image->heightEnd[i] < image->actualHeight[i])
+					{
+						/* Send to next process */
+						for (k = 0; k < width; ++k)
 						{
-							/* Send to next process */
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
+							for (j = 0; j < size; ++j)
 							{
-								for (j = 0; j < size; ++j)
-								{
-									int j2 = j + height - size;
-									dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-									dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-									dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-								}
-							}
-							#pragma omp master
-							{
-								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-
-							/* Recv from next process */
-								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-							}
-							#pragma omp barrier
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
-								{
-									pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-									receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-								}
+								int j2 = j + height - size;
+								dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+								dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+								dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 							}
 						}
+						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
 
-						/* Compute blur */
-						int heightStartLocal = max(size, image->heightStart[i]);
-						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
-
-						#pragma omp for schedule(static) collapse(2)
-						for (k = size; k < width - size; k++)
+						/* Recv from next process */
+						MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+						for (k = 0; k < width; ++k)
 						{
-							for (j = heightStartLocal; j < heightEndLocal; ++j)
+							for (j = 0; j < size; ++j)
 							{
-								int stencil_j, stencil_k;
-								int t_r = 0;
-								int t_g = 0;
-								int t_b = 0;
-								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-								{
-									if (j + stencil_j < image->heightStart[i])
-									{
-										int j2 = size - (image->heightStart[i] - j - stencil_j);
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else if (j + stencil_j >= image->heightEnd[i])
-									{
-										int j2 = j + stencil_j - image->heightEnd[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else
-									{
-										int j2 = j + stencil_j - image->heightStart[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-								}
-								int j2 = j - image->heightStart[i];
-								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+								pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
+								receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 							}
 						}
 					}
 
-					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
-					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
-					/* Copy the middle part of the image */
-					#pragma omp for schedule(static) collapse(2)
-					for (k = size; k < width - size; ++k)
+					/* Compute blur */
+					int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
+					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
+
+#pragma omp parallel for schedule(static) collapse(2)
+					for (k = size; k < width - size; k++)
 					{
-						for (j = heightStartLocal; j < heightEndLocal; ++j)
+						for (j = heightStartLocal; j < heightEndLocal; j++)
 						{
+							int stencil_j, stencil_k;
+							int t_r = 0;
+							int t_g = 0;
+							int t_b = 0;
+							for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+							{
+								if (j + stencil_j < image->heightStart[i])
+								{
+									int j2 = size - (image->heightStart[i] - j - stencil_j);
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
+								}
+								else if (j + stencil_j >= image->heightEnd[i])
+								{
+									int j2 = j + stencil_j - image->heightEnd[i];
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
+								}
+								else
+								{
+									int j2 = j + stencil_j - image->heightStart[i];
+									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									{
+										t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+										t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+										t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+									}
+								}
+							}
 							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+							new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+							new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+							new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
 						}
 					}
+				}
 
-					/* Last 10% of the image */
-					if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
+				int jBoundDown = max(1, image->heightStart[i]);
+				int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
+				for (k = 1; k < width - 1; k++)
+				{
+					for (j = jBoundDown; j < jBoundUp; j++)
 					{
-						if (image->heightStart[i] > image->actualHeight[i] * 0.9)
-						{
-							/* Recv from previous process */
-							#pragma omp master
-							{
-								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-							}
-							#pragma omp barrier
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
-								{
-									pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-									receivedTopPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-								}
-							}
+						int j2 = j - image->heightStart[i];
 
-							/* Send to previous process */
-							//BE CAREFUL TO THE image->heightStart[i] + j >= image->actualHeight[i]
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
-								{
-									if (j + image->heightStart[i] >= image->actualHeight[i])
-									{
-										dataSend[j * width * 3 + k] = 0;
-										dataSend[j * width * 3 + k + width] = 0;
-										dataSend[j * width * 3 + k + 2 * width] = 0;
-									}
-									else
-									{
-										dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j, k, width)].r;
-										dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j, k, width)].g;
-										dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j, k, width)].b;
-									}
-								}
-							}
-							#pragma omp master
-							{
-								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-							}
-							#pragma omp barrier
-						}
+						float diff_r;
+						float diff_g;
+						float diff_b;
 
-						if (image->heightEnd[i] < image->actualHeight[i])
-						{
-							/* Send to next process */
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
-								{
-									int j2 = j + height - size;
-									dataSend[j * width * 3 + k] = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-									dataSend[j * width * 3 + k + width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-									dataSend[j * width * 3 + k + 2 * width] = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-								}
-							}
-							#pragma omp master
-							{
-								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-							}
-
-							/* Recv from next process */
-							#pragma omp master
-							{
-								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-							}
-							#pragma omp barrier
-							#pragma omp for schedule(static) collapse(2)
-							for (k = 0; k < width; ++k)
-							{
-								for (j = 0; j < size; ++j)
-								{
-									pixel new_pixel = {.r = dataRecv[j * width * 3 + k], .g = dataRecv[j * width * 3 + k + width], .b = dataRecv[j * width * 3 + k + 2 * width]};
-									receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
-								}
-							}
-						}
-
-						/* Compute blur */
-						int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
-						int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
-
-						#pragma omp for schedule(static) collapse(2)
-						for (k = size; k < width - size; k++)
-						{
-							for (j = heightStartLocal; j < heightEndLocal; j++)
-							{
-								int stencil_j, stencil_k;
-								int t_r = 0;
-								int t_g = 0;
-								int t_b = 0;
-								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-								{
-									if (j + stencil_j < image->heightStart[i])
-									{
-										int j2 = size - (image->heightStart[i] - j - stencil_j);
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else if (j + stencil_j >= image->heightEnd[i])
-									{
-										int j2 = j + stencil_j - image->heightEnd[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else
-									{
-										int j2 = j + stencil_j - image->heightStart[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-								}
-								int j2 = j - image->heightStart[i];
-								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
-							}
-						}
-					}
-
-					int jBoundDown = max(1, image->heightStart[i]);
-					int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-					#pragma omp for schedule(static) collapse(2)
-					for (k = 1; k < width - 1; k++)
-					{
-						for (j = jBoundDown; j < jBoundUp; j++)
-						{
-							int j2 = j - image->heightStart[i];
-
-							float diff_r;
-							float diff_g;
-							float diff_b;
-
-							diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
-							diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
-							diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
+						diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
+						diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
+						diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
 
 						if (diff_r > threshold || -diff_r > threshold ||
 								diff_g > threshold || -diff_g > threshold ||
 								diff_b > threshold || -diff_b > threshold)
 						{
-							#pragma omp atomic write 
 							end = 0;
 						}
 
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
-						}
+						p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
+						p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
+						p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
 					}
+				}
 
-					//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
-					#pragma omp master
+				//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
+				int *received_end = malloc(sizeToUse * sizeof(int));
+				MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
+				for (j = 0; j < sizeToUse; ++j)
+				{
+					if (received_end[j] == 0)
 					{
-						int *received_end = malloc(sizeToUse * sizeof(int));
-						MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
-						for (j = 0; j < sizeToUse; ++j)
-						{
-							if (received_end[j] == 0)
-							{
-								end = 0;
-							}
-						}
-						free(received_end);
+						end = 0;
 					}
+				}
+				free(received_end);
+		} while (threshold > 0 && !end);
 
-					#pragma omp barrier
-				} while (threshold > 0 && !end);
-			} //END OF OMP PARALLEL
-		}
+}
 
-		MPI_Comm_free(&active_group);
+MPI_Comm_free(&active_group);
 
 #if SOBELF_DEBUG
-		printf("BLUR: number of iterations for image %d\n", n_iter);
+printf("BLUR: number of iterations for image %d\n", n_iter);
 #endif
 
-		free(new);
-	}
+free(new);
+}
 }
 
 void apply_sobel_filter(animated_gif *image, int rank, int size, int blur_radius)
@@ -1445,7 +1391,7 @@ int main(int argc, char **argv)
 	char *input_filename;
 	char *output_filename;
 	animated_gif *image;
-	struct timeval t1, t2;
+	double t1, t2;
 	omp_set_num_threads(nb_threads);
 	double duration, duration_loaded, duration_export, duration_filters;
 	int image_counter;
@@ -1471,7 +1417,7 @@ int main(int argc, char **argv)
 	omp_set_num_threads(nb_threads);
 #pragma omp parallel 
 	{
-		#pragma omp master
+#pragma omp master
 		{
 			printf("Number of Threads for Process %i is %i (desired: %i, provided: %i)\n", rank, omp_get_num_threads(), MPI_THREAD_FUNNELED, provided);
 		}
@@ -1479,8 +1425,7 @@ int main(int argc, char **argv)
 	/*================ IMPORT ======================*/
 
 	/* IMPORT Timer start */
-	gettimeofday(&t1, NULL);
-
+	t1 = MPI_Wtime();
 	/* Load file and store the pixels in array */
 	if(rank == 0) {
 		image = load_pixels(input_filename, rank, size, blur_radius);
@@ -1496,9 +1441,9 @@ int main(int argc, char **argv)
 	}
 
 	/* IMPORT Timer stop */
-	gettimeofday(&t2, NULL);
+	t2 = MPI_Wtime();
 
-	duration_loaded = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+	duration_loaded = t2 - t1;
 	duration = duration_loaded;
 
 	printf("GIF loaded from file %s with %d image(s) in %lf s\n",
@@ -1512,7 +1457,7 @@ int main(int argc, char **argv)
 	/*================= FILTER =====================*/
 
 	/* FILTER Timer start */
-	gettimeofday(&t1, NULL);
+	t1 = MPI_Wtime();
 
 	/* Convert the pixels into grayscale */
 	apply_gray_filter(image, rank, size);
@@ -1524,9 +1469,8 @@ int main(int argc, char **argv)
 	apply_sobel_filter(image, rank, size, blur_radius);
 
 	/* FILTER Timer stop */
-	gettimeofday(&t2, NULL);
-
-	duration_filters = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+	t2 = MPI_Wtime();
+	duration_filters = t2-t1;
 	duration = duration_filters;
 
 	printf("SOBEL done in %lf s\n", duration);
@@ -1538,7 +1482,7 @@ int main(int argc, char **argv)
 	/*==============================================*/
 
 	/* EXPORT Timer start */
-	gettimeofday(&t1, NULL);
+	t1 = MPI_Wtime();
 
 	/* Store file from array of pixels to GIF file */
 	if(!merge_image(image, rank, size, blur_radius)) {
@@ -1552,9 +1496,9 @@ int main(int argc, char **argv)
 	}
 
 	/* EXPORT Timer stop */
-	gettimeofday(&t2, NULL);
+	t2 = MPI_Wtime();
 
-	duration_export = (t2.tv_sec - t1.tv_sec) + ((t2.tv_usec - t1.tv_usec) / 1e6);
+	duration_export = t2 - t1; 
 	duration = duration_export;
 
 	printf("Export done in %lf s in file %s\n", duration, output_filename);

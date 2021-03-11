@@ -1,0 +1,18 @@
+
+set term postscript eps color 8
+set ytic auto
+
+unset label
+
+set autoscale y
+set style fill solid
+
+set ylabel "Latency (s)"
+set xlabel "Processes and Threads (p_t_)"
+set xtics rotate by 45 right
+set title title_text
+
+set output output_file
+plot input_file using 2:xtic(1) w l
+set output
+quit
