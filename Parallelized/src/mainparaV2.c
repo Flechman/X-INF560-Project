@@ -941,8 +941,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 				/* Perform at least one blur iteration */
 				do
 				{
-printf("START WHILE LOOP %d, THREAD %d\n", n_iter, omp_get_thread_num());
-fflush(stdout);
 					#pragma omp master
 					{
 						end = 1;
@@ -973,7 +971,7 @@ fflush(stdout);
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
 							#pragma omp barrier
-							#pragma omp for schedule(static) nowait collapse(2)
+							#pragma omp for schedule(static) collapse(2)
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1004,7 +1002,7 @@ fflush(stdout);
 						if (image->heightEnd[i] < image->actualHeight[i] / 10)
 						{
 							/* Send to next process */
-							#pragma omp for schedule(static) nowait collapse(2)
+							#pragma omp for schedule(static) collapse(2)
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1018,11 +1016,8 @@ fflush(stdout);
 							#pragma omp master
 							{
 								MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD);
-							}
 
 							/* Recv from next process */
-							#pragma omp master
-							{
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank + 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
 							#pragma omp barrier
@@ -1041,7 +1036,7 @@ fflush(stdout);
 						int heightStartLocal = max(size, image->heightStart[i]);
 						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
 
-						#pragma omp for schedule(static) nowait collapse(2)
+						#pragma omp for schedule(static) collapse(2)
 						for (k = size; k < width - size; k++)
 						{
 							for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1094,7 +1089,7 @@ fflush(stdout);
 					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
 					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
 					/* Copy the middle part of the image */
-					#pragma omp for schedule(static) nowait collapse(2)
+					#pragma omp for schedule(static) collapse(2)
 					for (k = size; k < width - size; ++k)
 					{
 						for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1117,7 +1112,7 @@ fflush(stdout);
 								MPI_Recv(dataRecv, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 							}
 							#pragma omp barrier
-							#pragma omp for schedule(static) nowait collapse(2)
+							#pragma omp for schedule(static) collapse(2)
 							for (k = 0; k < width; ++k)
 							{
 								for (j = 0; j < size; ++j)
@@ -1290,8 +1285,7 @@ fflush(stdout);
 						}
 						free(received_end);
 					}
-printf("END WHILE LOOP %d, THREAD %d, end = %d\n", n_iter-1, omp_get_thread_num(), end);
-fflush(stdout);
+
 					#pragma omp barrier
 				} while (threshold > 0 && !end);
 			} //END OF OMP PARALLEL
