@@ -27,6 +27,11 @@ for i in $INPUT_DIR/*gif ; do
 		OMP_NUM_THREADS=$2
 		MPI_EXPORT=$OMP_NUM_THREADS
 		salloc -n $1 mpirun ./sobelf $i $DEST $COUNTER $OMP_NUM_THREADS
+	elif [[ $ARGC -eq 3 ]];
+	then
+		OMP_NUM_THREADS=$2
+		MPI_EXPORT=$OMP_NUM_THREADS
+		salloc -n $1 -N 3 mpirun ./sobelf $i $DEST $COUNTER $OMP_NUM_THREADS
 	else
 		echo "You have to provide one or more arguments for the number of processes and/or number of nodes"
 	fi
