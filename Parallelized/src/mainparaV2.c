@@ -934,8 +934,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 			/* Perform at least one blur iteration */
 			do
 			{
-				printf("START WHILE LOOP %d, THREAD %d\n", n_iter, omp_get_thread_num());
-				fflush(stdout);
 				end = 1;
 				n_iter++;
 
@@ -1111,9 +1109,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 								}
 							}
 						}
-						/*{*/
 						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-						/*}*/
 					}
 
 					if (image->heightEnd[i] < image->actualHeight[i])
@@ -1237,11 +1233,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 				}
 				free(received_end);
-				/*}*/
-				printf("END WHILE LOOP %d, THREAD %d, end = %d\n", n_iter-1, omp_get_thread_num(), end);
-				fflush(stdout);
 		} while (threshold > 0 && !end);
-		/*} //END OF OMP PARALLEL*/
 
 }
 
