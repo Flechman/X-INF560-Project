@@ -12,6 +12,10 @@
 #include "gif_lib.h"
 #include "filters/gray_filter.h"
 
+void hello_cuda(int);
+void get_cuda_devices(int*);
+void set_cuda_devices(int, int);
+
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 #define PROFILING 1
@@ -1233,18 +1237,18 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 				}
 				free(received_end);
-		} while (threshold > 0 && !end);
+			} while (threshold > 0 && !end);
 
-}
+		}
 
-MPI_Comm_free(&active_group);
+		MPI_Comm_free(&active_group);
 
 #if SOBELF_DEBUG
-printf("BLUR: number of iterations for image %d\n", n_iter);
+		printf("BLUR: number of iterations for image %d\n", n_iter);
 #endif
 
-free(new);
-}
+		free(new);
+	}
 }
 
 void apply_sobel_filter(animated_gif *image, int rank, int size, int blur_radius)
@@ -1376,7 +1380,7 @@ int main(int argc, char **argv)
 	int rank, size;
 	int blur_radius = 5;
 	int blur_threshold = 20;
-	int nb_threads;
+	int nb_threads, nb_gpus;
 
 	int provided; // This is for the amount of threads provided by the environment;
 	/* MPI Initialization */
@@ -1414,7 +1418,13 @@ int main(int argc, char **argv)
 		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 
+	hello_cuda(rank);
+	get_cuda_devices(&nb_gpus);
+	set_cuda_devices(rank, nb_gpus);
 	omp_set_num_threads(nb_threads);
+
+	printf("%i GPUs available for %i\n", nb_gpus, rank);
+
 #pragma omp parallel 
 	{
 #pragma omp master

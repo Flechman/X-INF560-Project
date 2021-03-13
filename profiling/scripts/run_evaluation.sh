@@ -215,7 +215,7 @@ multiprofiler()
 
 	if [ -d "$RESULTS_FOLDER" ];
 	then
-		rm -rf $RESULTS_FOLDER 
+		rm -rf $RESULTS_FOLDER
 	else
 		mkdir -p $RESULTS_FOLDER
 		touch $OUTPUT_FILE
