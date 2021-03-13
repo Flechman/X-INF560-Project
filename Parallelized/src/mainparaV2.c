@@ -35,13 +35,13 @@ typedef struct pixel
 /* Represent one GIF image (animated or not */
 typedef struct animated_gif
 {
-	int n_images;   /* Number of images */
+	int n_images;	  /* Number of images */
 	int *heightStart;  /* Index of start of each image (for height) */
-	int *heightEnd;    /* Index of end of each image (for height) */
+	int *heightEnd;	/* Index of end of each image (for height) */
 	int *actualWidth;  /* Actual width of each image (INITIAL width before parallelism) */
 	int *actualHeight; /* Actual height of each image (INITIAL width before parallelism) */
-	pixel **p;      /* Pixels of each image */
-	GifFileType *g; /* Internal representation.
+	pixel **p;		   /* Pixels of each image */
+	GifFileType *g;	/* Internal representation.
 			   DO NOT MODIFY */
 } animated_gif;
 
@@ -50,7 +50,8 @@ int min(int a, int b) { return (a < b) ? a : b; }
 int max(int a, int b) { return (a > b) ? a : b; }
 
 /* Auxiliary method to limit the number of processors working if necessary */
-int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius) {
+int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius)
+{
 	int sizeToUse = size;
 	int minHeightPerProcess = actualHeight / size;
 	if (minHeightPerProcess < blur_radius)
@@ -66,7 +67,8 @@ int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius) {
  */
 animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 {
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		GifFileType *g;
 		ColorMapObject *colmap;
 		int error;
@@ -137,7 +139,7 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 			actualHeight[i] = g->SavedImages[i].ImageDesc.Height;
 			sizeToUse = compute_nb_proc_to_use(size, actualHeight[i], blur_radius);
 			heightStart[i] = 0;
-			heightEnd[i] = round((double)actualHeight[i]/(double)sizeToUse);
+			heightEnd[i] = round((double)actualHeight[i] / (double)sizeToUse);
 
 #if SOBELF_DEBUG
 			printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
@@ -244,7 +246,8 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 	return NULL;
 }
 
-animated_gif* distribute_image(animated_gif* original, int rank, int size, int blur_radius) {
+animated_gif *distribute_image(animated_gif *original, int rank, int size, int blur_radius)
+{
 	int n_images = 0;
 	int *heightStart;
 	int *heightEnd;
@@ -255,7 +258,8 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 
 	int sizeToUse = size;
 
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		n_images = original->n_images;
 		heightStart = original->heightStart;
 		heightEnd = original->heightEnd;
@@ -266,7 +270,8 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 
 	MPI_Bcast(&n_images, 1, MPI_INTEGER, 0, MPI_COMM_WORLD);
 
-	if(rank != 0) {
+	if (rank != 0)
+	{
 		/* Allocate width and height */
 		heightStart = (int *)malloc(n_images * sizeof(int));
 		if (heightStart == NULL)
@@ -311,10 +316,13 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 	MPI_Bcast(actualHeight, n_images, MPI_INTEGER, 0, MPI_COMM_WORLD);
 	MPI_Bcast(actualWidth, n_images, MPI_INTEGER, 0, MPI_COMM_WORLD);
 
-	if(rank != 0) {
-		for(i = 0; i < n_images; ++i) {
+	if (rank != 0)
+	{
+		for (i = 0; i < n_images; ++i)
+		{
 			sizeToUse = compute_nb_proc_to_use(size, actualHeight[i], blur_radius);
-			if(rank < sizeToUse) {
+			if (rank < sizeToUse)
+			{
 				double fractionImage = 1.0 / (double)sizeToUse;
 				double start = (double)rank * fractionImage;
 				double end = (double)(rank + 1) * fractionImage;
@@ -331,7 +339,9 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 							i, width * height);
 					return NULL;
 				}
-			} else {
+			}
+			else
+			{
 				heightStart[i] = 0;
 				heightEnd[i] = 0;
 				p[i] = NULL;
@@ -340,26 +350,32 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 	}
 
 	//Fill pixels
-	for(i = 0; i < n_images; ++i) {
+	for (i = 0; i < n_images; ++i)
+	{
 		int j, k, l;
 		sizeToUse = compute_nb_proc_to_use(size, actualHeight[i], blur_radius);
-		if(rank == 0) {
+		if (rank == 0)
+		{
 			double fractionImage = 1.0 / (double)sizeToUse;
 
 			//Send to every process its pixels
-			for(j = 1; j < sizeToUse; ++j) {
+			for (j = 1; j < sizeToUse; ++j)
+			{
 				int startIndex = round((double)j * fractionImage * (double)actualHeight[i]);
-				int endIndex = round((double)(j+1) * fractionImage * (double)actualHeight[i]);
+				int endIndex = round((double)(j + 1) * fractionImage * (double)actualHeight[i]);
 				int height = endIndex - startIndex;
 				int rowLength = actualWidth[i] * 3;
 				int *data = malloc(rowLength * height * sizeof(int));
-				if(data == NULL) {
+				if (data == NULL)
+				{
 					printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
 					return 0;
 				}
-				for(k = 0; k < height; ++k) {
+				for (k = 0; k < height; ++k)
+				{
 					int k2 = k + startIndex;
-					for(l = 0; l < actualWidth[i]; ++l) {
+					for (l = 0; l < actualWidth[i]; ++l)
+					{
 						data[l + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].r;
 						data[l + actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].g;
 						data[l + 2 * actualWidth[i] + k * rowLength] = p[i][TWO_D_TO_ONE_D(k2, l, actualWidth[i])].b;
@@ -368,22 +384,28 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 				MPI_Send(data, rowLength * height, MPI_INTEGER, j, i, MPI_COMM_WORLD);
 				free(data);
 			}
-		} else {
-			if(rank < sizeToUse) {
+		}
+		else
+		{
+			if (rank < sizeToUse)
+			{
 				//Receive every pixel, store them
 				int height = heightEnd[i] - heightStart[i];
 				int rowLength = actualWidth[i] * 3;
 				int *data = malloc(rowLength * height * sizeof(int));
-				if(data == NULL) {
+				if (data == NULL)
+				{
 					printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
 					return 0;
 				}
 				MPI_Recv(data, rowLength * height, MPI_INTEGER, 0, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-				for(j = 0; j < height; ++j) {
-					for(k = 0; k < actualWidth[i]; ++k) {
-						pixel new_pixel = {.r = data[k + j * rowLength], 
-							.g = data[k + actualWidth[i] + j * rowLength], 
-							.b = data[k + 2 * actualWidth[i] + j * rowLength] };
+				for (j = 0; j < height; ++j)
+				{
+					for (k = 0; k < actualWidth[i]; ++k)
+					{
+						pixel new_pixel = {.r = data[k + j * rowLength],
+							.g = data[k + actualWidth[i] + j * rowLength],
+							.b = data[k + 2 * actualWidth[i] + j * rowLength]};
 						p[i][TWO_D_TO_ONE_D(j, k, actualWidth[i])] = new_pixel;
 					}
 				}
@@ -392,9 +414,12 @@ animated_gif* distribute_image(animated_gif* original, int rank, int size, int b
 		}
 	}
 
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		return original;
-	} else {
+	}
+	else
+	{
 		/* Allocate image info */
 		animated_gif *image = (animated_gif *)malloc(sizeof(animated_gif));
 		if (image == NULL)
@@ -455,7 +480,8 @@ int output_modified_read_gif(char *filename, GifFileType *g)
 	return 1;
 }
 
-int merge_image(animated_gif* image, int rank, int size, int blur_radius) {
+int merge_image(animated_gif *image, int rank, int size, int blur_radius)
+{
 	int i, j, k, l;
 	int sizeToUse = size;
 	for (i = 0; i < image->n_images; ++i)
@@ -469,19 +495,21 @@ int merge_image(animated_gif* image, int rank, int size, int blur_radius) {
 			for (j = 1; j < sizeToUse; ++j)
 			{
 				int startIndex = round(j * fractionImage * image->actualHeight[i]);
-				int endIndex = round((j+1) * fractionImage * image->actualHeight[i]);
+				int endIndex = round((j + 1) * fractionImage * image->actualHeight[i]);
 				int height = endIndex - startIndex;
 				int rowLength = width * 3;
 				int *data = malloc(rowLength * height * sizeof(int));
-				if(data == NULL) {
+				if (data == NULL)
+				{
 					printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
 					return 0;
 				}
 				MPI_Recv(data, rowLength * height, MPI_INTEGER, j, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 				for (k = 0; k < height; ++k)
 				{
-					int k2 = k+startIndex;
-					for(l = 0; l < width; ++l) {
+					int k2 = k + startIndex;
+					for (l = 0; l < width; ++l)
+					{
 						pixel new_pixel = {.r = data[l + k * rowLength], .g = data[l + width + k * rowLength], .b = data[l + 2 * width + k * rowLength]};
 						image->p[i][TWO_D_TO_ONE_D(k2, l, width)] = new_pixel;
 					}
@@ -491,12 +519,14 @@ int merge_image(animated_gif* image, int rank, int size, int blur_radius) {
 		}
 		else
 		{
-			if(rank < sizeToUse) {
+			if (rank < sizeToUse)
+			{
 				//Send every pixel to process 0
 				int height = image->heightEnd[i] - image->heightStart[i];
 				int rowLength = width * 3;
 				int *data = malloc(rowLength * height * sizeof(int));
-				if(data == NULL) {
+				if (data == NULL)
+				{
 					printf("ERROR : could not allocate %d x %d integers\n", height, rowLength);
 					return 0;
 				}
@@ -520,7 +550,8 @@ int merge_image(animated_gif* image, int rank, int size, int blur_radius) {
 
 int store_pixels(char *filename, animated_gif *image, int rank, int size)
 {
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		int n_colors = 0;
 		pixel **p;
 		int i, j, k;
@@ -549,8 +580,14 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				image->g->SColorMap->Colors[image->g->SBackGroundColor].Green +
 				image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue) /
 			3;
-		if (moy < 0) { moy = 0; }
-		if (moy > 255) { moy = 255; }
+		if (moy < 0)
+		{
+			moy = 0;
+		}
+		if (moy > 255)
+		{
+			moy = 255;
+		}
 
 #if SOBELF_DEBUG
 		printf("[DEBUG] Background color (%d,%d,%d) -> (%d,%d,%d)\n",
@@ -669,8 +706,14 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 							 image->g->SColorMap->Colors[tr_color].Green +
 							 image->g->SColorMap->Colors[tr_color].Blue) /
 							3;
-						if (moy < 0) { moy = 0; }
-						if (moy > 255) { moy = 255; }
+						if (moy < 0)
+						{
+							moy = 0;
+						}
+						if (moy > 255)
+						{
+							moy = 255;
+						}
 
 #if SOBELF_DEBUG
 						printf("[DEBUG] Transparency color image %d (%d,%d,%d) -> (%d,%d,%d)\n",
@@ -858,8 +901,14 @@ void apply_gray_filter(animated_gif *image, int rank, int size)
 			int moy;
 
 			moy = (p[i][j].r + p[i][j].g + p[i][j].b) / 3;
-			if (moy < 0) { moy = 0; }
-			if (moy > 255) { moy = 255; }
+			if (moy < 0)
+			{
+				moy = 0;
+			}
+			if (moy > 255)
+			{
+				moy = 255;
+			}
 
 			p[i][j].r = moy;
 			p[i][j].g = moy;
@@ -933,24 +982,14 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 		int color = (rank < sizeToUse) ? 1 : 0;
 		MPI_Comm_split(MPI_COMM_WORLD, color, rank, &active_group);
 
-		if(rank < sizeToUse) {
+		if (rank < sizeToUse)
+		{
 
 			/* Perform at least one blur iteration */
 			do
 			{
 				end = 1;
 				n_iter++;
-
-				for (k = 0; k < width - 1; k++) 
-				{
-					for (j = image->heightStart[i]; j < heightEnd; j++) 
-					{
-						int j2 = j - image->heightStart[i];
-						new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-						new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-						new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-					}
-				}
 
 				/* First 10% of the image */
 				if (image->heightStart[i] < image->actualHeight[i] / 10)
@@ -980,7 +1019,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							}
 						}
 						MPI_Send(dataSend, 3 * width * size, MPI_INTEGER, rank - 1, 0, MPI_COMM_WORLD);
-
 					}
 
 					if (image->heightEnd[i] < image->actualHeight[i] / 10)
@@ -1008,72 +1046,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 								receivedBottomPart[TWO_D_TO_ONE_D(j, k, width)] = new_pixel;
 							}
 						}
-					}
-
-					/* Compute blur */
-					int heightStartLocal = max(size, image->heightStart[i]);
-					int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
-#pragma omp parallel for schedule(static) collapse(2)
-					for (k = size; k < width - size; k++)
-					{
-						for (j = heightStartLocal; j < heightEndLocal; ++j)
-						{
-							int stencil_j, stencil_k;
-							int t_r = 0;
-							int t_g = 0;
-							int t_b = 0;
-							for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-							{
-								if (j + stencil_j < image->heightStart[i])
-								{
-									int j2 = size - (image->heightStart[i] - j - stencil_j);
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-								else if (j + stencil_j >= image->heightEnd[i])
-								{
-									int j2 = j + stencil_j - image->heightEnd[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-								else
-								{
-									int j2 = j + stencil_j - image->heightStart[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-							}
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
-						}
-					}
-				}
-
-				int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
-				int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
-				/* Copy the middle part of the image */
-				for (k = size; k < width - size; ++k)
-				{
-					for (j = heightStartLocal; j < heightEndLocal; ++j)
-					{
-						int j2 = j - image->heightStart[i];
-						new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-						new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-						new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 					}
 				}
 
@@ -1142,87 +1114,177 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 							}
 						}
 					}
-
-					/* Compute blur */
-					int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
-					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
-
-#pragma omp parallel for schedule(static) collapse(2)
-					for (k = size; k < width - size; k++)
-					{
-						for (j = heightStartLocal; j < heightEndLocal; j++)
-						{
-							int stencil_j, stencil_k;
-							int t_r = 0;
-							int t_g = 0;
-							int t_b = 0;
-							for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-							{
-								if (j + stencil_j < image->heightStart[i])
-								{
-									int j2 = size - (image->heightStart[i] - j - stencil_j);
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-								else if (j + stencil_j >= image->heightEnd[i])
-								{
-									int j2 = j + stencil_j - image->heightEnd[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-								else
-								{
-									int j2 = j + stencil_j - image->heightStart[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-							}
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
-						}
-					}
 				}
 
-				int jBoundDown = max(1, image->heightStart[i]);
-				int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-				for (k = 1; k < width - 1; k++)
+#pragma omp parallel default(none) private(j, k) shared(i, width, height, sizeToUse, n_iter, new, p, end, size, threshold, rank, nbProc, image, heightEnd, receivedTopPart, receivedBottomPart, dataSend, dataRecv,stdout)
 				{
-					for (j = jBoundDown; j < jBoundUp; j++)
+
+#pragma omp for schedule(static) collapse(2)
+					for (k = 0; k < width - 1; k++)
 					{
-						int j2 = j - image->heightStart[i];
-
-						float diff_r;
-						float diff_g;
-						float diff_b;
-
-						diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
-						diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
-						diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
-
-						if (diff_r > threshold || -diff_r > threshold ||
-								diff_g > threshold || -diff_g > threshold ||
-								diff_b > threshold || -diff_b > threshold)
+						for (j = image->heightStart[i]; j < heightEnd; j++)
 						{
-							end = 0;
+							int j2 = j - image->heightStart[i];
+							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
 						}
+					}
 
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
+					if (image->heightStart[i] < image->actualHeight[i] / 10)
+					{
+						/* Compute blur first 10% image*/
+						int heightStartLocal = max(size, image->heightStart[i]);
+						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
+#pragma omp for schedule(static) collapse(2)
+						for (k = size; k < width - size; k++)
+						{
+							for (j = heightStartLocal; j < heightEndLocal; ++j)
+							{
+								int stencil_j, stencil_k;
+								int t_r = 0;
+								int t_g = 0;
+								int t_b = 0;
+								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+								{
+									if (j + stencil_j < image->heightStart[i])
+									{
+										int j2 = size - (image->heightStart[i] - j - stencil_j);
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else if (j + stencil_j >= image->heightEnd[i])
+									{
+										int j2 = j + stencil_j - image->heightEnd[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else
+									{
+										int j2 = j + stencil_j - image->heightStart[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+								}
+								int j2 = j - image->heightStart[i];
+								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+							}
+						}
+					}
+
+					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
+					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
+					/* Copy the middle part of the image */
+#pragma omp for schedule(static) collapse(2) nowait
+					for (k = size; k < width - size; ++k)
+					{
+						for (j = heightStartLocal; j < heightEndLocal; ++j)
+						{
+							int j2 = j - image->heightStart[i];
+							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
+							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
+							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
+						}
+					}
+
+					if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
+					{
+						/* Compute blur last 10% image*/
+						int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
+						int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
+
+#pragma omp for schedule(static) collapse(2)
+						for (k = size; k < width - size; k++)
+						{
+							for (j = heightStartLocal; j < heightEndLocal; j++)
+							{
+								int stencil_j, stencil_k;
+								int t_r = 0;
+								int t_g = 0;
+								int t_b = 0;
+								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+								{
+									if (j + stencil_j < image->heightStart[i])
+									{
+										int j2 = size - (image->heightStart[i] - j - stencil_j);
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else if (j + stencil_j >= image->heightEnd[i])
+									{
+										int j2 = j + stencil_j - image->heightEnd[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else
+									{
+										int j2 = j + stencil_j - image->heightStart[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+								}
+								int j2 = j - image->heightStart[i];
+								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
+							}
+						}
+					}
+
+					int jBoundDown = max(1, image->heightStart[i]);
+					int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
+#pragma omp for schedule(static) collapse(2) nowait
+					for (k = 1; k < width - 1; k++)
+					{
+						for (j = jBoundDown; j < jBoundUp; j++)
+						{
+							int j2 = j - image->heightStart[i];
+
+							float diff_r;
+							float diff_g;
+							float diff_b;
+
+							diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
+							diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
+							diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
+
+							if (diff_r > threshold || -diff_r > threshold ||
+									diff_g > threshold || -diff_g > threshold ||
+									diff_b > threshold || -diff_b > threshold)
+							{
+								end = 0;
+							}
+
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
+						}
 					}
 				}
 
@@ -1238,7 +1300,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 				}
 				free(received_end);
 			} while (threshold > 0 && !end);
-
 		}
 
 		MPI_Comm_free(&active_group);
@@ -1264,42 +1325,49 @@ void apply_sobel_filter(animated_gif *image, int rank, int size, int blur_radius
 	{
 		int sizeToUse = compute_nb_proc_to_use(size, image->actualHeight[i], blur_radius);
 
-		if(rank < sizeToUse) {
+		if (rank < sizeToUse)
+		{
 			width = image->actualWidth[i];
 			height = image->heightEnd[i] - image->heightStart[i];
 
 			pixel *sobel;
 			pixel *above = malloc(width * sizeof(pixel));
 			pixel *below = malloc(width * sizeof(pixel));
-			if(image->heightStart[i] > 0) {
+			if (image->heightStart[i] > 0)
+			{
 				int *dataSend = malloc(width * 3 * sizeof(int));
 				int *dataRecv = malloc(width * 3 * sizeof(int));
-				for(j = 0; j < width; ++j) {
+				for (j = 0; j < width; ++j)
+				{
 					dataSend[j] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].r;
 					dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].g;
 					dataSend[j + 2 * width] = image->p[i][TWO_D_TO_ONE_D(0, j, width)].b;
 				}
-				MPI_Recv(dataRecv, 3 * width, MPI_INTEGER, rank-1, image->heightStart[i]-1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-				MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank-1, image->heightStart[i], MPI_COMM_WORLD);
-				for(j = 0; j < width; ++j) {
+				MPI_Recv(dataRecv, 3 * width, MPI_INTEGER, rank - 1, image->heightStart[i] - 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank - 1, image->heightStart[i], MPI_COMM_WORLD);
+				for (j = 0; j < width; ++j)
+				{
 					pixel new_pixel = {.r = dataRecv[j], .g = dataRecv[j + width], .b = dataRecv[j + 2 * width]};
 					below[TWO_D_TO_ONE_D(0, j, width)] = new_pixel;
 				}
 				free(dataSend);
 				free(dataRecv);
 			}
-			if(image->heightEnd[i] < image->actualHeight[i]) {
+			if (image->heightEnd[i] < image->actualHeight[i])
+			{
 				int *dataSend = malloc(width * 3 * sizeof(int));
 				int *dataRecv = malloc(width * 3 * sizeof(int));
 				int height = image->heightEnd[i] - image->heightStart[i];
-				for(j = 0; j < width; ++j) {
-					dataSend[j] = image->p[i][TWO_D_TO_ONE_D(height-1, j, width)].r;
-					dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(height-1, j, width)].g;
-					dataSend[j + 2 * width] = image->p[i][TWO_D_TO_ONE_D(height-1, j, width)].b;
+				for (j = 0; j < width; ++j)
+				{
+					dataSend[j] = image->p[i][TWO_D_TO_ONE_D(height - 1, j, width)].r;
+					dataSend[j + width] = image->p[i][TWO_D_TO_ONE_D(height - 1, j, width)].g;
+					dataSend[j + 2 * width] = image->p[i][TWO_D_TO_ONE_D(height - 1, j, width)].b;
 				}
-				MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank+1, image->heightEnd[i]-1, MPI_COMM_WORLD);
-				MPI_Recv(dataRecv, 3 * width, MPI_INTEGER, rank+1, image->heightEnd[i], MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-				for(j = 0; j < width; ++j) {
+				MPI_Send(dataSend, 3 * width, MPI_INTEGER, rank + 1, image->heightEnd[i] - 1, MPI_COMM_WORLD);
+				MPI_Recv(dataRecv, 3 * width, MPI_INTEGER, rank + 1, image->heightEnd[i], MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+				for (j = 0; j < width; ++j)
+				{
 					pixel new_pixel = {.r = dataRecv[j], .g = dataRecv[j + width], .b = dataRecv[j + 2 * width]};
 					above[TWO_D_TO_ONE_D(0, j, width)] = new_pixel;
 				}
@@ -1315,7 +1383,7 @@ void apply_sobel_filter(animated_gif *image, int rank, int size, int blur_radius
 				for (k = 1; k < width - 1; k++)
 				{
 					int pixel_blue_no, pixel_blue_n, pixel_blue_ne;
-					int pixel_blue_o , pixel_blue  , pixel_blue_e ;
+					int pixel_blue_o, pixel_blue, pixel_blue_e;
 					int pixel_blue_so, pixel_blue_s, pixel_blue_se;
 
 					float deltaX_blue;
@@ -1386,11 +1454,9 @@ int main(int argc, char **argv)
 	/* MPI Initialization */
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
-
 	/* Get the rank of the current task and the number of MPI processes */
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
-
 
 	char *input_filename;
 	char *output_filename;
@@ -1437,7 +1503,8 @@ int main(int argc, char **argv)
 	/* IMPORT Timer start */
 	t1 = MPI_Wtime();
 	/* Load file and store the pixels in array */
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		image = load_pixels(input_filename, rank, size, blur_radius);
 		if (image == NULL)
 		{
@@ -1480,7 +1547,7 @@ int main(int argc, char **argv)
 
 	/* FILTER Timer stop */
 	t2 = MPI_Wtime();
-	duration_filters = t2-t1;
+	duration_filters = t2 - t1;
 	duration = duration_filters;
 
 	printf("SOBEL done in %lf s\n", duration);
@@ -1495,10 +1562,12 @@ int main(int argc, char **argv)
 	t1 = MPI_Wtime();
 
 	/* Store file from array of pixels to GIF file */
-	if(!merge_image(image, rank, size, blur_radius)) {
+	if (!merge_image(image, rank, size, blur_radius))
+	{
 		return 1;
 	}
-	if(rank == 0) {
+	if (rank == 0)
+	{
 		if (!store_pixels(output_filename, image, rank, size))
 		{
 			return 1;
@@ -1508,13 +1577,14 @@ int main(int argc, char **argv)
 	/* EXPORT Timer stop */
 	t2 = MPI_Wtime();
 
-	duration_export = t2 - t1; 
+	duration_export = t2 - t1;
 	duration = duration_export;
 
 	printf("Export done in %lf s in file %s\n", duration, output_filename);
 
-	if (rank == 0) {
-		printf( "OUTPUT: Image %d SOBEL done in %lf s for %s with %d images GIF loaded in %lf Export done in %lf\n", image_counter, duration_filters, input_filename, image->n_images, duration_loaded, duration_export);
+	if (rank == 0)
+	{
+		printf("OUTPUT: Image %d SOBEL done in %lf s for %s with %d images GIF loaded in %lf Export done in %lf\n", image_counter, duration_filters, input_filename, image->n_images, duration_loaded, duration_export);
 	}
 	MPI_Finalize();
 	return 0;
