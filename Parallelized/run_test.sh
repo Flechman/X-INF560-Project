@@ -2,7 +2,7 @@
 
 
 source ~/.bashrc
-refresh_env
+source ~/set_env.sh
 make
 
 INPUT_DIR=images/original

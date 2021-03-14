@@ -12,21 +12,16 @@
 #include "gif_lib.h"
 #include "filters/gray_filter.h"
 
-void hello_cuda(int);
-void get_cuda_devices(int*);
-void set_cuda_devices(int, int);
-void apply_blur_filter_CUDA(pixel* p_i, pixel* receivedTopPart, pixel* receivedBottomPart, int* end, int size, int threshold, int rank, int height, int width, int heightStart, int heightEnd, int actualWidth, int actualHeight) 
-
-	/* Set this macro to 1 to enable debugging information */
+/* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 #define PROFILING 1
 
-	/* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
+/* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
 #define TWO_D_TO_ONE_D(l, c, nb_c) \
-		((l) * (nb_c) + (c))
+	((l) * (nb_c) + (c))
 
-	/* Represent one pixel from the image */
-	typedef struct pixel
+/* Represent one pixel from the image */
+typedef struct pixel
 {
 	int r; /* Red */
 	int g; /* Green */
@@ -61,6 +56,12 @@ int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius)
 	}
 	return sizeToUse;
 }
+
+void hello_cuda(int);
+void get_cuda_devices(int*);
+void set_cuda_devices(int, int);
+void apply_blur_filter_CUDA(pixel* p_i, pixel* receivedTopPart, pixel* receivedBottomPart, int* end, int size, int threshold, int rank, int height, int width, int heightStart, int heightEnd, int actualWidth, int actualHeight);
+
 
 /*
  * Load a GIF image from a file and return a
@@ -1117,177 +1118,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 				}
 
-#pragma omp parallel default(none) private(j, k) shared(i, width, height, sizeToUse, n_iter, new, p, end, size, threshold, rank, nbProc, image, heightEnd, receivedTopPart, receivedBottomPart, dataSend, dataRecv,stdout)
-				{
-
-#pragma omp for schedule(static) collapse(2)
-					for (k = 0; k < width - 1; k++)
-					{
-						for (j = image->heightStart[i]; j < heightEnd; j++)
-						{
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-						}
-					}
-
-					if (image->heightStart[i] < image->actualHeight[i] / 10)
-					{
-						/* Compute blur first 10% image*/
-						int heightStartLocal = max(size, image->heightStart[i]);
-						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
-#pragma omp for schedule(static) collapse(2)
-						for (k = size; k < width - size; k++)
-						{
-							for (j = heightStartLocal; j < heightEndLocal; ++j)
-							{
-								int stencil_j, stencil_k;
-								int t_r = 0;
-								int t_g = 0;
-								int t_b = 0;
-								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-								{
-									if (j + stencil_j < image->heightStart[i])
-									{
-										int j2 = size - (image->heightStart[i] - j - stencil_j);
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else if (j + stencil_j >= image->heightEnd[i])
-									{
-										int j2 = j + stencil_j - image->heightEnd[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else
-									{
-										int j2 = j + stencil_j - image->heightStart[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-								}
-								int j2 = j - image->heightStart[i];
-								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
-							}
-						}
-					}
-
-					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
-					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
-					/* Copy the middle part of the image */
-#pragma omp for schedule(static) collapse(2) nowait
-					for (k = size; k < width - size; ++k)
-					{
-						for (j = heightStartLocal; j < heightEndLocal; ++j)
-						{
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = p[i][TWO_D_TO_ONE_D(j2, k, width)].r;
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = p[i][TWO_D_TO_ONE_D(j2, k, width)].g;
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = p[i][TWO_D_TO_ONE_D(j2, k, width)].b;
-						}
-					}
-
-					if (image->heightEnd[i] > image->actualHeight[i] * 0.9)
-					{
-						/* Compute blur last 10% image*/
-						int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
-						int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
-
-#pragma omp for schedule(static) collapse(2)
-						for (k = size; k < width - size; k++)
-						{
-							for (j = heightStartLocal; j < heightEndLocal; j++)
-							{
-								int stencil_j, stencil_k;
-								int t_r = 0;
-								int t_g = 0;
-								int t_b = 0;
-								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
-								{
-									if (j + stencil_j < image->heightStart[i])
-									{
-										int j2 = size - (image->heightStart[i] - j - stencil_j);
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else if (j + stencil_j >= image->heightEnd[i])
-									{
-										int j2 = j + stencil_j - image->heightEnd[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-									else
-									{
-										int j2 = j + stencil_j - image->heightStart[i];
-										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-										{
-											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-										}
-									}
-								}
-								int j2 = j - image->heightStart[i];
-								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
-							}
-						}
-					}
-
-					int jBoundDown = max(1, image->heightStart[i]);
-					int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-#pragma omp for schedule(static) collapse(2) nowait
-					for (k = 1; k < width - 1; k++)
-					{
-						for (j = jBoundDown; j < jBoundUp; j++)
-						{
-							int j2 = j - image->heightStart[i];
-
-							float diff_r;
-							float diff_g;
-							float diff_b;
-
-							diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
-							diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
-							diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
-
-							if (diff_r > threshold || -diff_r > threshold ||
-									diff_g > threshold || -diff_g > threshold ||
-									diff_b > threshold || -diff_b > threshold)
-							{
-								end = 0;
-							}
-
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
-							p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
-						}
-					}
-				}
+				apply_blur_filter_CUDA(p[i], receivedTopPart, receivedBottomPart, &end, sizeToUse, threshold, rank, height, width, image->heightStart[i], image->heightEnd[i], image->actualWidth[i], image->actualHeight[i]);
 
 				//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
 				int *received_end = malloc(sizeToUse * sizeof(int));
