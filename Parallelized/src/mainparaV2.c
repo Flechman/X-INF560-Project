@@ -15,17 +15,18 @@
 void hello_cuda(int);
 void get_cuda_devices(int*);
 void set_cuda_devices(int, int);
+void apply_blur_filter_CUDA(pixel* p_i, pixel* receivedTopPart, pixel* receivedBottomPart, int* end, int size, int threshold, int rank, int height, int width, int heightStart, int heightEnd, int actualWidth, int actualHeight) 
 
-/* Set this macro to 1 to enable debugging information */
+	/* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 #define PROFILING 1
 
-/* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
+	/* Maps 2D (l, c) coordinates to 1D l*nb_c + c coordinate */
 #define TWO_D_TO_ONE_D(l, c, nb_c) \
-	((l) * (nb_c) + (c))
+		((l) * (nb_c) + (c))
 
-/* Represent one pixel from the image */
-typedef struct pixel
+	/* Represent one pixel from the image */
+	typedef struct pixel
 {
 	int r; /* Red */
 	int g; /* Green */
