@@ -12,6 +12,10 @@
 #include "gif_lib.h"
 #include "filters/gray_filter.h"
 
+void hello_cuda(int);
+void get_cuda_devices(int*);
+void set_cuda_devices(int, int);
+
 /* Set this macro to 1 to enable debugging information */
 #define SOBELF_DEBUG 0
 #define PROFILING 1
@@ -139,13 +143,13 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 			printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
-				   i,
-				   g->SavedImages[i].ImageDesc.Left,
-				   g->SavedImages[i].ImageDesc.Top,
-				   g->SavedImages[i].ImageDesc.Width,
-				   g->SavedImages[i].ImageDesc.Height,
-				   g->SavedImages[i].ImageDesc.Interlace,
-				   g->SavedImages[i].ImageDesc.ColorMap);
+					i,
+					g->SavedImages[i].ImageDesc.Left,
+					g->SavedImages[i].ImageDesc.Top,
+					g->SavedImages[i].ImageDesc.Width,
+					g->SavedImages[i].ImageDesc.Height,
+					g->SavedImages[i].ImageDesc.Interlace,
+					g->SavedImages[i].ImageDesc.ColorMap);
 #endif
 		}
 
@@ -159,9 +163,9 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 		printf("Global color map: count:%d bpp:%d sort:%d\n",
-			   g->SColorMap->ColorCount,
-			   g->SColorMap->BitsPerPixel,
-			   g->SColorMap->SortFlag);
+				g->SColorMap->ColorCount,
+				g->SColorMap->BitsPerPixel,
+				g->SColorMap->SortFlag);
 #endif
 
 		/* Allocate the array of pixels to be returned */
@@ -234,7 +238,7 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 		printf("-> GIF w/ %d image(s) with first image of size %d x %d\n",
-			   image->n_images, image->width[0], image->height[0]);
+				image->n_images, image->width[0], image->height[0]);
 #endif
 
 		return image;
@@ -400,8 +404,8 @@ animated_gif *distribute_image(animated_gif *original, int rank, int size, int b
 					for (k = 0; k < actualWidth[i]; ++k)
 					{
 						pixel new_pixel = {.r = data[k + j * rowLength],
-										   .g = data[k + actualWidth[i] + j * rowLength],
-										   .b = data[k + 2 * actualWidth[i] + j * rowLength]};
+							.g = data[k + actualWidth[i] + j * rowLength],
+							.b = data[k + 2 * actualWidth[i] + j * rowLength]};
 						p[i][TWO_D_TO_ONE_D(j, k, actualWidth[i])] = new_pixel;
 					}
 				}
@@ -573,9 +577,9 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 		/* Change the background color and store it */
 		int moy;
 		moy = (image->g->SColorMap->Colors[image->g->SBackGroundColor].Red +
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Green +
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue) /
-			  3;
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Green +
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue) /
+			3;
 		if (moy < 0)
 		{
 			moy = 0;
@@ -587,10 +591,10 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 		printf("[DEBUG] Background color (%d,%d,%d) -> (%d,%d,%d)\n",
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Red,
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Green,
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue,
-			   moy, moy, moy);
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Red,
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Green,
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue,
+				moy, moy, moy);
 #endif
 
 		colormap[0].Red = moy;
@@ -612,7 +616,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				int tr_color = image->g->ExtensionBlocks[j].Bytes[3];
 
 				if (tr_color >= 0 &&
-					tr_color < 255)
+						tr_color < 255)
 				{
 
 					int found = -1;
@@ -629,19 +633,19 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 					printf("[DEBUG] Transparency color image %d (%d,%d,%d) -> (%d,%d,%d)\n",
-						   i,
-						   image->g->SColorMap->Colors[tr_color].Red,
-						   image->g->SColorMap->Colors[tr_color].Green,
-						   image->g->SColorMap->Colors[tr_color].Blue,
-						   moy, moy, moy);
+							i,
+							image->g->SColorMap->Colors[tr_color].Red,
+							image->g->SColorMap->Colors[tr_color].Green,
+							image->g->SColorMap->Colors[tr_color].Blue,
+							moy, moy, moy);
 #endif
 
 					for (k = 0; k < n_colors; k++)
 					{
 						if (
-							moy == colormap[k].Red &&
-							moy == colormap[k].Green &&
-							moy == colormap[k].Blue)
+								moy == colormap[k].Red &&
+								moy == colormap[k].Green &&
+								moy == colormap[k].Blue)
 						{
 							found = k;
 						}
@@ -657,7 +661,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 						printf("[DEBUG]\tNew color %d\n",
-							   n_colors);
+								n_colors);
 #endif
 
 						colormap[n_colors].Red = moy;
@@ -672,7 +676,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 					{
 #if SOBELF_DEBUG
 						printf("[DEBUG]\tFound existing color %d\n",
-							   found);
+								found);
 #endif
 						image->g->ExtensionBlocks[j].Bytes[3] = found;
 					}
@@ -692,7 +696,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 					int tr_color = image->g->SavedImages[i].ExtensionBlocks[j].Bytes[3];
 
 					if (tr_color >= 0 &&
-						tr_color < 255)
+							tr_color < 255)
 					{
 
 						int found = -1;
@@ -713,19 +717,19 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 						printf("[DEBUG] Transparency color image %d (%d,%d,%d) -> (%d,%d,%d)\n",
-							   i,
-							   image->g->SColorMap->Colors[tr_color].Red,
-							   image->g->SColorMap->Colors[tr_color].Green,
-							   image->g->SColorMap->Colors[tr_color].Blue,
-							   moy, moy, moy);
+								i,
+								image->g->SColorMap->Colors[tr_color].Red,
+								image->g->SColorMap->Colors[tr_color].Green,
+								image->g->SColorMap->Colors[tr_color].Blue,
+								moy, moy, moy);
 #endif
 
 						for (k = 0; k < n_colors; k++)
 						{
 							if (
-								moy == colormap[k].Red &&
-								moy == colormap[k].Green &&
-								moy == colormap[k].Blue)
+									moy == colormap[k].Red &&
+									moy == colormap[k].Green &&
+									moy == colormap[k].Blue)
 							{
 								found = k;
 							}
@@ -741,7 +745,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 							printf("[DEBUG]\tNew color %d\n",
-								   n_colors);
+									n_colors);
 #endif
 
 							colormap[n_colors].Red = moy;
@@ -756,7 +760,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 						{
 #if SOBELF_DEBUG
 							printf("[DEBUG]\tFound existing color %d\n",
-								   found);
+									found);
 #endif
 							image->g->SavedImages[i].ExtensionBlocks[j].Bytes[3] = found;
 						}
@@ -767,7 +771,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 		printf("[DEBUG] Number of colors after background and transparency: %d\n",
-			   n_colors);
+				n_colors);
 #endif
 
 		p = image->p;
@@ -778,7 +782,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 			printf("OUTPUT: Processing image %d (total of %d images) -> %d x %d\n",
-				   i, image->n_images, image->actualWidth[i], image->actualHeight[i]);
+					i, image->n_images, image->actualWidth[i], image->actualHeight[i]);
 #endif
 
 			for (j = 0; j < image->actualWidth[i] * image->actualHeight[i]; j++)
@@ -787,8 +791,8 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				for (k = 0; k < n_colors; k++)
 				{
 					if (p[i][j].r == colormap[k].Red &&
-						p[i][j].g == colormap[k].Green &&
-						p[i][j].b == colormap[k].Blue)
+							p[i][j].g == colormap[k].Green &&
+							p[i][j].b == colormap[k].Blue)
 					{
 						found = 1;
 					}
@@ -805,7 +809,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 					printf("[DEBUG] Found new %d color (%d,%d,%d)\n",
-						   n_colors, p[i][j].r, p[i][j].g, p[i][j].b);
+							n_colors, p[i][j].r, p[i][j].g, p[i][j].b);
 #endif
 
 					colormap[n_colors].Red = p[i][j].r;
@@ -852,8 +856,8 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				for (k = 0; k < n_colors; k++)
 				{
 					if (p[i][j].r == image->g->SColorMap->Colors[k].Red &&
-						p[i][j].g == image->g->SColorMap->Colors[k].Green &&
-						p[i][j].b == image->g->SColorMap->Colors[k].Blue)
+							p[i][j].g == image->g->SColorMap->Colors[k].Green &&
+							p[i][j].b == image->g->SColorMap->Colors[k].Blue)
 					{
 						found_index = k;
 					}
@@ -1112,10 +1116,10 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 				}
 
-			#pragma omp parallel default(none) private(j, k) shared(i, width, height, sizeToUse, n_iter, new, p, end, size, threshold, rank, nbProc, image, heightEnd, receivedTopPart, receivedBottomPart, dataSend, dataRecv,stdout)
+#pragma omp parallel default(none) private(j, k) shared(i, width, height, sizeToUse, n_iter, new, p, end, size, threshold, rank, nbProc, image, heightEnd, receivedTopPart, receivedBottomPart, dataSend, dataRecv,stdout)
 				{
 
-			#pragma omp for schedule(static) collapse(2)
+#pragma omp for schedule(static) collapse(2)
 					for (k = 0; k < width - 1; k++)
 					{
 						for (j = image->heightStart[i]; j < heightEnd; j++)
@@ -1132,7 +1136,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 						/* Compute blur first 10% image*/
 						int heightStartLocal = max(size, image->heightStart[i]);
 						int heightEndLocal = min(image->actualHeight[i] / 10 - size, image->heightEnd[i]);
-			#pragma omp for schedule(static) collapse(2)
+#pragma omp for schedule(static) collapse(2)
 						for (k = size; k < width - size; k++)
 						{
 							for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1185,7 +1189,7 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					int heightStartLocal = max(image->actualHeight[i] / 10 - size, image->heightStart[i]);
 					int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] * 0.9 + size);
 					/* Copy the middle part of the image */
-			#pragma omp for schedule(static) collapse(2) nowait
+#pragma omp for schedule(static) collapse(2) nowait
 					for (k = size; k < width - size; ++k)
 					{
 						for (j = heightStartLocal; j < heightEndLocal; ++j)
@@ -1203,86 +1207,86 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 						int heightStartLocal = max(image->heightStart[i], image->actualHeight[i] * 0.9 + size);
 						int heightEndLocal = min(image->heightEnd[i], image->actualHeight[i] - size);
 
-			#pragma omp for schedule(static) collapse(2)
-					for (k = size; k < width - size; k++)
-					{
-						for (j = heightStartLocal; j < heightEndLocal; j++)
+#pragma omp for schedule(static) collapse(2)
+						for (k = size; k < width - size; k++)
 						{
-							int stencil_j, stencil_k;
-							int t_r = 0;
-							int t_g = 0;
-							int t_b = 0;
-							for (stencil_j = -size; stencil_j <= size; ++stencil_j)
+							for (j = heightStartLocal; j < heightEndLocal; j++)
 							{
-								if (j + stencil_j < image->heightStart[i])
+								int stencil_j, stencil_k;
+								int t_r = 0;
+								int t_g = 0;
+								int t_b = 0;
+								for (stencil_j = -size; stencil_j <= size; ++stencil_j)
 								{
-									int j2 = size - (image->heightStart[i] - j - stencil_j);
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+									if (j + stencil_j < image->heightStart[i])
 									{
-										t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										int j2 = size - (image->heightStart[i] - j - stencil_j);
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedTopPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else if (j + stencil_j >= image->heightEnd[i])
+									{
+										int j2 = j + stencil_j - image->heightEnd[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
+									}
+									else
+									{
+										int j2 = j + stencil_j - image->heightStart[i];
+										for (stencil_k = -size; stencil_k <= size; ++stencil_k)
+										{
+											t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
+											t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
+											t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
+										}
 									}
 								}
-								else if (j + stencil_j >= image->heightEnd[i])
-								{
-									int j2 = j + stencil_j - image->heightEnd[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += receivedBottomPart[TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
-								else
-								{
-									int j2 = j + stencil_j - image->heightStart[i];
-									for (stencil_k = -size; stencil_k <= size; ++stencil_k)
-									{
-										t_r += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].r;
-										t_g += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].g;
-										t_b += p[i][TWO_D_TO_ONE_D(j2, k + stencil_k, width)].b;
-									}
-								}
+								int j2 = j - image->heightStart[i];
+								new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
+								new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
 							}
-							int j2 = j - image->heightStart[i];
-							new[TWO_D_TO_ONE_D(j2, k, width)].r = t_r / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].g = t_g / ((2 * size + 1) * (2 * size + 1));
-							new[TWO_D_TO_ONE_D(j2, k, width)].b = t_b / ((2 * size + 1) * (2 * size + 1));
 						}
 					}
-				}
 
-				int jBoundDown = max(1, image->heightStart[i]);
-				int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
-			#pragma omp for schedule(static) collapse(2) nowait
-				for (k = 1; k < width - 1; k++)
-				{
-					for (j = jBoundDown; j < jBoundUp; j++)
+					int jBoundDown = max(1, image->heightStart[i]);
+					int jBoundUp = min(image->actualHeight[i] - 1, image->heightEnd[i]);
+#pragma omp for schedule(static) collapse(2) nowait
+					for (k = 1; k < width - 1; k++)
 					{
-						int j2 = j - image->heightStart[i];
-
-						float diff_r;
-						float diff_g;
-						float diff_b;
-
-						diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
-						diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
-						diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
-
-						if (diff_r > threshold || -diff_r > threshold ||
-							diff_g > threshold || -diff_g > threshold ||
-							diff_b > threshold || -diff_b > threshold)
+						for (j = jBoundDown; j < jBoundUp; j++)
 						{
-							end = 0;
-						}
+							int j2 = j - image->heightStart[i];
 
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
-						p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
+							float diff_r;
+							float diff_g;
+							float diff_b;
+
+							diff_r = (new[TWO_D_TO_ONE_D(j2, k, width)].r - p[i][TWO_D_TO_ONE_D(j2, k, width)].r);
+							diff_g = (new[TWO_D_TO_ONE_D(j2, k, width)].g - p[i][TWO_D_TO_ONE_D(j2, k, width)].g);
+							diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p[i][TWO_D_TO_ONE_D(j2, k, width)].b);
+
+							if (diff_r > threshold || -diff_r > threshold ||
+									diff_g > threshold || -diff_g > threshold ||
+									diff_b > threshold || -diff_b > threshold)
+							{
+								end = 0;
+							}
+
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].r = new[TWO_D_TO_ONE_D(j2, k, width)].r;
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].g = new[TWO_D_TO_ONE_D(j2, k, width)].g;
+							p[i][TWO_D_TO_ONE_D(j2, k, width)].b = new[TWO_D_TO_ONE_D(j2, k, width)].b;
+						}
 					}
 				}
-			}
 
 				//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
 				int *received_end = malloc(sizeToUse * sizeof(int));
@@ -1444,7 +1448,7 @@ int main(int argc, char **argv)
 	int rank, size;
 	int blur_radius = 5;
 	int blur_threshold = 20;
-	int nb_threads;
+	int nb_threads, nb_gpus;
 
 	int provided; // This is for the amount of threads provided by the environment;
 	/* MPI Initialization */
@@ -1480,8 +1484,14 @@ int main(int argc, char **argv)
 		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 
+	hello_cuda(rank);
+	get_cuda_devices(&nb_gpus);
+	set_cuda_devices(rank, nb_gpus);
 	omp_set_num_threads(nb_threads);
-#pragma omp parallel
+
+	printf("%i GPUs available for %i\n", nb_gpus, rank);
+
+#pragma omp parallel 
 	{
 #pragma omp master
 		{
@@ -1514,7 +1524,7 @@ int main(int argc, char **argv)
 	duration = duration_loaded;
 
 	printf("GIF loaded from file %s with %d image(s) in %lf s\n",
-		   input_filename, image->n_images, duration);
+			input_filename, image->n_images, duration);
 
 #if PROFILING
 	MPI_Barrier(MPI_COMM_WORLD);

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+
+source ~/.bashrc
+refresh_env
 make
 
 INPUT_DIR=images/original
