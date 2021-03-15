@@ -213,6 +213,9 @@ multiprofiler()
 	local THREADS_PROCESSES_OUTPUT_FILE="$(dirname "${OUTPUT_FILE}")/THREADS_PROCESSES_OUTPUT_FILE.eps"
 	local THREADS_PROCESSES_INPUT_FILE="$(dirname $THREADS_PROCESSES_OUTPUT_FILE)/THREADS_PROCESSES_INPUT_FILE.dat"
 
+	# Change to CMD_DIR
+	cd $CMD_DIR
+
 	if [ -d "$RESULTS_FOLDER" ];
 	then
 		rm -rf $RESULTS_FOLDER
@@ -272,5 +275,7 @@ multiprofiler()
 		PLOTTER="${PLOTTER_DIR}/evaluation-procs-threads.plg"
 		gnuplot -e "input_file='${THREADS_PROCESSES_INPUT_FILE}'; output_file='${THREADS_PROCESSES_OUTPUT_FILE}'; title_text='${TITLE_TEXT}'" $PLOTTER 
 	fi
+
+	cd "$OLDPWD"
 
 }

@@ -57,11 +57,6 @@ int compute_nb_proc_to_use(int size, int actualHeight, int blur_radius)
 	return sizeToUse;
 }
 
-void hello_cuda(int);
-void get_cuda_devices(int*);
-void set_cuda_devices(int, int);
-void apply_blur_filter_CUDA(pixel* p_i, pixel* receivedTopPart, pixel* receivedBottomPart, int* end, int size, int threshold, int rank, int height, int width, int heightStart, int heightEnd, int actualWidth, int actualHeight);
-
 
 /*
  * Load a GIF image from a file and return a
@@ -1118,8 +1113,6 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 					}
 				}
 
-				apply_blur_filter_CUDA(p[i], receivedTopPart, receivedBottomPart, &end, sizeToUse, threshold, rank, height, width, image->heightStart[i], image->heightEnd[i], image->actualWidth[i], image->actualHeight[i]);
-
 				//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
 				int *received_end = malloc(sizeToUse * sizeof(int));
 				MPI_Allgather(&end, 1, MPI_INTEGER, received_end, 1, MPI_INTEGER, active_group);
@@ -1280,7 +1273,7 @@ int main(int argc, char **argv)
 	int rank, size;
 	int blur_radius = 5;
 	int blur_threshold = 20;
-	int nb_threads, nb_gpus;
+	int nb_threads;
 
 	int provided; // This is for the amount of threads provided by the environment;
 	/* MPI Initialization */
@@ -1316,12 +1309,6 @@ int main(int argc, char **argv)
 		MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
 	}
 
-	hello_cuda(rank);
-	get_cuda_devices(&nb_gpus);
-	set_cuda_devices(rank, nb_gpus);
-	omp_set_num_threads(nb_threads);
-
-	printf("%i GPUs available for %i\n", nb_gpus, rank);
 
 #pragma omp parallel 
 	{

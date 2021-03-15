@@ -32,7 +32,7 @@ OBJ= $(OBJ_DIR)/dgif_lib.o \
      $(OBJ_DIR)/openbsd-reallocarray.o \
      $(OBJ_DIR)/quantize.o
 
-all: cuda $(OBJ_DIR) sobelf
+all: $(OBJ_DIR) sobelf
 
 $(OBJ_DIR):
 	mkdir $(OBJ_DIR)
@@ -44,7 +44,7 @@ cuda:
 	$(NVCC) -c $(CUDA_SRC) -o $(CUDA_OBJ) 
 
 sobelf:$(OBJ)
-	$(CC) $(OMPFLAG) $(CUDALIB) $(CUDAFLAGS) $(CUDA_OBJ) $^ -o $@ $(LDFLAGS)
+	$(CC) $(OMPFLAG)  $^ -o $@ $(LDFLAGS)
 
 clean:
 	rm -f sobelf $(OBJ) $(CUDA_OBJ)
