@@ -143,13 +143,13 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 			printf("Image %d: l:%d t:%d w:%d h:%d interlace:%d localCM:%p\n",
-				   i,
-				   g->SavedImages[i].ImageDesc.Left,
-				   g->SavedImages[i].ImageDesc.Top,
-				   g->SavedImages[i].ImageDesc.Width,
-				   g->SavedImages[i].ImageDesc.Height,
-				   g->SavedImages[i].ImageDesc.Interlace,
-				   g->SavedImages[i].ImageDesc.ColorMap);
+					i,
+					g->SavedImages[i].ImageDesc.Left,
+					g->SavedImages[i].ImageDesc.Top,
+					g->SavedImages[i].ImageDesc.Width,
+					g->SavedImages[i].ImageDesc.Height,
+					g->SavedImages[i].ImageDesc.Interlace,
+					g->SavedImages[i].ImageDesc.ColorMap);
 #endif
 		}
 
@@ -163,9 +163,9 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 		printf("Global color map: count:%d bpp:%d sort:%d\n",
-			   g->SColorMap->ColorCount,
-			   g->SColorMap->BitsPerPixel,
-			   g->SColorMap->SortFlag);
+				g->SColorMap->ColorCount,
+				g->SColorMap->BitsPerPixel,
+				g->SColorMap->SortFlag);
 #endif
 
 		/* Allocate the array of pixels to be returned */
@@ -238,7 +238,7 @@ animated_gif *load_pixels(char *filename, int rank, int size, int blur_radius)
 
 #if SOBELF_DEBUG
 		printf("-> GIF w/ %d image(s) with first image of size %d x %d\n",
-			   image->n_images, image->width[0], image->height[0]);
+				image->n_images, image->width[0], image->height[0]);
 #endif
 
 		return image;
@@ -404,8 +404,8 @@ animated_gif *distribute_image(animated_gif *original, int rank, int size, int b
 					for (k = 0; k < actualWidth[i]; ++k)
 					{
 						pixel new_pixel = {.r = data[k + j * rowLength],
-										   .g = data[k + actualWidth[i] + j * rowLength],
-										   .b = data[k + 2 * actualWidth[i] + j * rowLength]};
+							.g = data[k + actualWidth[i] + j * rowLength],
+							.b = data[k + 2 * actualWidth[i] + j * rowLength]};
 						p[i][TWO_D_TO_ONE_D(j, k, actualWidth[i])] = new_pixel;
 					}
 				}
@@ -577,9 +577,9 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 		/* Change the background color and store it */
 		int moy;
 		moy = (image->g->SColorMap->Colors[image->g->SBackGroundColor].Red +
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Green +
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue) /
-			  3;
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Green +
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue) /
+			3;
 		if (moy < 0)
 		{
 			moy = 0;
@@ -591,10 +591,10 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 		printf("[DEBUG] Background color (%d,%d,%d) -> (%d,%d,%d)\n",
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Red,
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Green,
-			   image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue,
-			   moy, moy, moy);
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Red,
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Green,
+				image->g->SColorMap->Colors[image->g->SBackGroundColor].Blue,
+				moy, moy, moy);
 #endif
 
 		colormap[0].Red = moy;
@@ -616,7 +616,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				int tr_color = image->g->ExtensionBlocks[j].Bytes[3];
 
 				if (tr_color >= 0 &&
-					tr_color < 255)
+						tr_color < 255)
 				{
 
 					int found = -1;
@@ -633,19 +633,19 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 					printf("[DEBUG] Transparency color image %d (%d,%d,%d) -> (%d,%d,%d)\n",
-						   i,
-						   image->g->SColorMap->Colors[tr_color].Red,
-						   image->g->SColorMap->Colors[tr_color].Green,
-						   image->g->SColorMap->Colors[tr_color].Blue,
-						   moy, moy, moy);
+							i,
+							image->g->SColorMap->Colors[tr_color].Red,
+							image->g->SColorMap->Colors[tr_color].Green,
+							image->g->SColorMap->Colors[tr_color].Blue,
+							moy, moy, moy);
 #endif
 
 					for (k = 0; k < n_colors; k++)
 					{
 						if (
-							moy == colormap[k].Red &&
-							moy == colormap[k].Green &&
-							moy == colormap[k].Blue)
+								moy == colormap[k].Red &&
+								moy == colormap[k].Green &&
+								moy == colormap[k].Blue)
 						{
 							found = k;
 						}
@@ -661,7 +661,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 						printf("[DEBUG]\tNew color %d\n",
-							   n_colors);
+								n_colors);
 #endif
 
 						colormap[n_colors].Red = moy;
@@ -676,7 +676,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 					{
 #if SOBELF_DEBUG
 						printf("[DEBUG]\tFound existing color %d\n",
-							   found);
+								found);
 #endif
 						image->g->ExtensionBlocks[j].Bytes[3] = found;
 					}
@@ -696,7 +696,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 					int tr_color = image->g->SavedImages[i].ExtensionBlocks[j].Bytes[3];
 
 					if (tr_color >= 0 &&
-						tr_color < 255)
+							tr_color < 255)
 					{
 
 						int found = -1;
@@ -717,19 +717,19 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 						printf("[DEBUG] Transparency color image %d (%d,%d,%d) -> (%d,%d,%d)\n",
-							   i,
-							   image->g->SColorMap->Colors[tr_color].Red,
-							   image->g->SColorMap->Colors[tr_color].Green,
-							   image->g->SColorMap->Colors[tr_color].Blue,
-							   moy, moy, moy);
+								i,
+								image->g->SColorMap->Colors[tr_color].Red,
+								image->g->SColorMap->Colors[tr_color].Green,
+								image->g->SColorMap->Colors[tr_color].Blue,
+								moy, moy, moy);
 #endif
 
 						for (k = 0; k < n_colors; k++)
 						{
 							if (
-								moy == colormap[k].Red &&
-								moy == colormap[k].Green &&
-								moy == colormap[k].Blue)
+									moy == colormap[k].Red &&
+									moy == colormap[k].Green &&
+									moy == colormap[k].Blue)
 							{
 								found = k;
 							}
@@ -745,7 +745,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 							printf("[DEBUG]\tNew color %d\n",
-								   n_colors);
+									n_colors);
 #endif
 
 							colormap[n_colors].Red = moy;
@@ -760,7 +760,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 						{
 #if SOBELF_DEBUG
 							printf("[DEBUG]\tFound existing color %d\n",
-								   found);
+									found);
 #endif
 							image->g->SavedImages[i].ExtensionBlocks[j].Bytes[3] = found;
 						}
@@ -771,7 +771,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 		printf("[DEBUG] Number of colors after background and transparency: %d\n",
-			   n_colors);
+				n_colors);
 #endif
 
 		p = image->p;
@@ -782,7 +782,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 			printf("OUTPUT: Processing image %d (total of %d images) -> %d x %d\n",
-				   i, image->n_images, image->actualWidth[i], image->actualHeight[i]);
+					i, image->n_images, image->actualWidth[i], image->actualHeight[i]);
 #endif
 
 			for (j = 0; j < image->actualWidth[i] * image->actualHeight[i]; j++)
@@ -791,8 +791,8 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				for (k = 0; k < n_colors; k++)
 				{
 					if (p[i][j].r == colormap[k].Red &&
-						p[i][j].g == colormap[k].Green &&
-						p[i][j].b == colormap[k].Blue)
+							p[i][j].g == colormap[k].Green &&
+							p[i][j].b == colormap[k].Blue)
 					{
 						found = 1;
 					}
@@ -809,7 +809,7 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 
 #if SOBELF_DEBUG
 					printf("[DEBUG] Found new %d color (%d,%d,%d)\n",
-						   n_colors, p[i][j].r, p[i][j].g, p[i][j].b);
+							n_colors, p[i][j].r, p[i][j].g, p[i][j].b);
 #endif
 
 					colormap[n_colors].Red = p[i][j].r;
@@ -856,8 +856,8 @@ int store_pixels(char *filename, animated_gif *image, int rank, int size)
 				for (k = 0; k < n_colors; k++)
 				{
 					if (p[i][j].r == image->g->SColorMap->Colors[k].Red &&
-						p[i][j].g == image->g->SColorMap->Colors[k].Green &&
-						p[i][j].b == image->g->SColorMap->Colors[k].Blue)
+							p[i][j].g == image->g->SColorMap->Colors[k].Green &&
+							p[i][j].b == image->g->SColorMap->Colors[k].Blue)
 					{
 						found_index = k;
 					}
@@ -957,27 +957,27 @@ __global__ void apply_blur_filter_CUDA(pixel *p_i, pixel *receivedTopPart, pixel
 	err = cudaMalloc((void**)new, width * height * sizeof(pixel));
 	if(err != cudaSuccess) {
 		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    }
+	}
 
 	int imgHeightEnd = (heightEnd >= (actualHeight - 1)) ? actualHeight - 1 : heightEnd;
 
 	{
 		idx = blockIdx.x * blockDim.x + threadIdx.x
 
-		for (k = idx; k < width - 1; k += nbThreads)
-		{
-			for (j = heightStart; j < imgHeightEnd; j++)
+			for (k = idx; k < width - 1; k += nbThreads)
 			{
-				int j2 = j - heightStart;
-				new[TWO_D_TO_ONE_D(j2, k, width)].r = p_i[TWO_D_TO_ONE_D(j2, k, width)].r;
-				new[TWO_D_TO_ONE_D(j2, k, width)].g = p_i[TWO_D_TO_ONE_D(j2, k, width)].g;
-				new[TWO_D_TO_ONE_D(j2, k, width)].b = p_i[TWO_D_TO_ONE_D(j2, k, width)].b;
+				for (j = heightStart; j < imgHeightEnd; j++)
+				{
+					int j2 = j - heightStart;
+					new[TWO_D_TO_ONE_D(j2, k, width)].r = p_i[TWO_D_TO_ONE_D(j2, k, width)].r;
+					new[TWO_D_TO_ONE_D(j2, k, width)].g = p_i[TWO_D_TO_ONE_D(j2, k, width)].g;
+					new[TWO_D_TO_ONE_D(j2, k, width)].b = p_i[TWO_D_TO_ONE_D(j2, k, width)].b;
+				}
 			}
-		}
 		err = cudaThreadSynchronize();
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 
 		if (heightStart < actualHeight / 10)
 		{
@@ -1036,7 +1036,7 @@ __global__ void apply_blur_filter_CUDA(pixel *p_i, pixel *receivedTopPart, pixel
 		err = cudaThreadSynchronize();
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 
 		int heightStartLocal = max(actualHeight / 10 - size, heightStart);
 		int heightEndLocal = min(heightEnd, actualHeight * 0.9 + size);
@@ -1110,7 +1110,7 @@ __global__ void apply_blur_filter_CUDA(pixel *p_i, pixel *receivedTopPart, pixel
 		err = cudaThreadSynchronize();
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 
 		int jBoundDown = max(1, heightStart);
 		int jBoundUp = min(actualHeight - 1, heightEnd);
@@ -1130,8 +1130,8 @@ __global__ void apply_blur_filter_CUDA(pixel *p_i, pixel *receivedTopPart, pixel
 				diff_b = (new[TWO_D_TO_ONE_D(j2, k, width)].b - p_i[TWO_D_TO_ONE_D(j2, k, width)].b);
 
 				if (diff_r > threshold || -diff_r > threshold ||
-					diff_g > threshold || -diff_g > threshold ||
-					diff_b > threshold || -diff_b > threshold)
+						diff_g > threshold || -diff_g > threshold ||
+						diff_b > threshold || -diff_b > threshold)
 				{
 					atomicExch(end, 0);
 				}
@@ -1144,7 +1144,7 @@ __global__ void apply_blur_filter_CUDA(pixel *p_i, pixel *receivedTopPart, pixel
 		err = cudaThreadSynchronize();
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 	}
 	cudaFree(new);
 }
@@ -1184,20 +1184,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 		int *d_end;
 		err = cudaMalloc((void**)d_receivedTopPart, size * width * sizeof(pixel));
 		if(err != cudaSuccess) {
-        	fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+		}
 		err = cudaMalloc((void**)d_receivedBottomPart, size * width * sizeof(pixel));
 		if(err != cudaSuccess) {
-        	fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+		}
 		err = cudaMalloc((void**)d_p_i, width * height * sizeof(pixel));
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 		err = cudaMalloc((void**)d_end, sizeof(int));
 		if(err != cudaSuccess) {
 			fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    	}
+		}
 
 		/* Perform at least one blur iteration */
 		do
@@ -1332,32 +1332,32 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 
 			err = cudaMemcpy(d_receivedTopPart, receivedTopPart, size * width * sizeof(pixel), cudaMemcpyHostToDevice);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 			err = cudaMemcpy(d_receivedBottomPart, receivedBottomPart, size * width * sizeof(pixel), cudaMemcpyHostToDevice);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 			err = cudaMemcpy(p[i], d_p_i, height * width * sizeof(pixel), cudaMemcpyHostToDevice);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 			err = cudaMemcpy(&end, d_end, sizeof(int), cudaMemcpyHostToDevice);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 
 			//1D GRID WITH 1D BLOCK
 			apply_blur_filter_CUDA<<<TO_FILL>>>(d_p_i, receivedTopPart, receivedBottomPart, d_end, size, threshold, rank, height, width, image->heightStart[i], image->heightEnd[i], image->actualWidth[i], image->actualHeight[i]);
 
 			err = cudaMemcpy(d_p_i, p[i], height * width * sizeof(pixel), cudaMemcpyDeviceToHost);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 			err = cudaMemcpy(d_end, &end, sizeof(int), cudaMemcpyDeviceToHost);
 			if(err != cudaSuccess) {
-        		fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
-    		}
+				fprintf(stderr, "CUDA ERROR: process %d, <%s>\n", rank, cudaGetErrorString(err));
+			}
 
 			//CHECK THAT ALL THE OTHER PROCESSES ON THIS IMAGE HAVE END = 0
 			int *received_end = malloc(size * sizeof(int));
@@ -1370,20 +1370,20 @@ void apply_blur_filter(animated_gif *image, int size, int threshold, int rank, i
 				}
 			}
 			free(received_end);
-        } while (threshold > 0 && !end);
+		} while (threshold > 0 && !end);
 
 #if SOBELF_DEBUG
 		printf("BLUR: number of iterations for image %d\n", n_iter);
 #endif
 
-	free(receivedTopPart);
-	free(receivedBottomPart);
-	free(dataSend);
-	free(dataRecv);
-	cudaFree(d_end);
-	cudaFree(d_p_i);
-	cudaFree(d_receivedTopPart);
-	cudaFree(d_receivedBottomPart);
+		free(receivedTopPart);
+		free(receivedBottomPart);
+		free(dataSend);
+		free(dataRecv);
+		cudaFree(d_end);
+		cudaFree(d_p_i);
+		cudaFree(d_receivedTopPart);
+		cudaFree(d_receivedBottomPart);
 
 	}
 }
@@ -1598,7 +1598,7 @@ int main(int argc, char **argv)
 	duration = duration_loaded;
 
 	printf("GIF loaded from file %s with %d image(s) in %lf s\n",
-		   input_filename, image->n_images, duration);
+			input_filename, image->n_images, duration);
 
 #if PROFILING
 	MPI_Barrier(MPI_COMM_WORLD);

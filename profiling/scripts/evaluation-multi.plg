@@ -1,8 +1,8 @@
 
 set term postscript eps color 8
+
 set ytic auto
-
-
+set autoscale x
 set autoscale y
 set boxwidth 0.9
 set style fill solid
@@ -15,6 +15,6 @@ set xtics rotate by 45 right
 set title title_text
 
 set output output_file
-plot for[input_file in files] input_file  using 3:xtic(6)  title system(sprintf("basename %s",input_file))
+plot for[input_file in files] input_file using 3:xtic(6) notitle
 set output
 quit

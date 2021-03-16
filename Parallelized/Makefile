@@ -6,11 +6,7 @@ CC=mpicc
 CFLAGS= -Wall -O3 -I$(HEADER_DIR)
 LDFLAGS=-lm
 OMPFLAG=-fopenmp
-NVCC=nvcc
-CUDAFLAGS=-lcudart
-CUDALIB=-L/usr/local/cuda/lib64
-CUDA_SRC=src/cuda_kernels.cu
-CUDA_OBJ=obj/cuda_kernels.o
+TYPE=mpi
 
 SRC= dgif_lib.c \
      egif_lib.c \
@@ -18,7 +14,6 @@ SRC= dgif_lib.c \
      gif_font.c \
      gif_hash.c \
      gifalloc.c \
-     mainparaV2.c \
      openbsd-reallocarray.c \
      quantize.c
 
@@ -28,23 +23,29 @@ OBJ= $(OBJ_DIR)/dgif_lib.o \
      $(OBJ_DIR)/gif_font.o \
      $(OBJ_DIR)/gif_hash.o \
      $(OBJ_DIR)/gifalloc.o \
-     $(OBJ_DIR)/mainparaV2.o \
      $(OBJ_DIR)/openbsd-reallocarray.o \
      $(OBJ_DIR)/quantize.o
 
-all: $(OBJ_DIR) sobelf
+
+all: $(OBJ_DIR) prog sobelf
 
 $(OBJ_DIR):
 	mkdir $(OBJ_DIR)
 
 $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c
-	$(CC) $(OMPFLAG) $(CFLAGS) -c $^ -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) -c $^ -o $@ $(LDFLAGS)
 
-cuda:
-	$(NVCC) -c $(CUDA_SRC) -o $(CUDA_OBJ) 
+prog:$(OBJ)
+
+ifeq ($(TYPE),mpi)
+	$(CC) $(CFLAGS) $^ -c $(SRC_DIR)/mainparaV2-MPI.c -o $(OBJ_DIR)/mainparaV2.o $(LDFLAGS)
+else
+	$(CC) $(CFLAGS) $(OMPFLAG) $^ -c $(SRC_DIR)/mainparaV2.c -o $(OBJ_DIR)/mainparaV2.o $(LDFLAGS)
+endif
 
 sobelf:$(OBJ)
-	$(CC) $(OMPFLAG)  $^ -o $@ $(LDFLAGS)
+	$(CC) $(OMPFLAG) $^ $(OBJ_DIR)/mainparaV2.o -o $@ $(LDFLAGS)
 
 clean:
-	rm -f sobelf $(OBJ) $(CUDA_OBJ)
+	rm -f sobelf $(OBJ) 
+

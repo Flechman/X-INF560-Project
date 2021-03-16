@@ -23,14 +23,14 @@ profiler()
 		case $1 in
 			("--help") 
 				printf "\t[-s|--script] -> Your script\n"
-				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
+				printf "\t[-a|--arg] -> Arguments to your script. Replace spaces with '_' and hyphen with '.'\n"
 				printf "\t[-t|--title] -> Title of graph\n"
 				printf "\t[-g|--graph_type] -> Graph type\n"
 				return $(())
 				;;
 			("-h") 
 				printf "\t[-s|--script] -> Your script\n"
-				printf "\t[-a|--arg] -> Arguments to your script. Separate multiple arguments with ','\n"
+				printf "\t[-a|--arg] -> Arguments to your script. Replace spaces with '_' and hyphen with '.'\n"
 				printf "\t[-t|--title] -> Title of graph\n"
 				printf "\t[-g|--graph_type] -> Graph type\n"
 				return $(())
@@ -50,11 +50,13 @@ profiler()
 				CMD="${array[next_item]}";;
 			(*"-a"*)
 				next_arg=${array[next_item]}
-				CMD_ARG=${next_arg//,/ }
+				CMD_ARG=${next_arg//./-}
+				CMD_ARG=${CMD_ARG//_/ }	
 				;;
 			(*"--arg"*)
 				next_arg=${array[next_item]}
-				CMD_ARG=${next_arg//,/ }
+				CMD_ARG=${next_arg//./-}
+				CMD_ARG=${CMD_ARG//_/ }	
 				;;
 			(*"-t"*)
 				TITLE_TEXT="${array[next_item]}";;
@@ -180,16 +182,20 @@ multiprofiler()
 		next=$((index+1))
 		case $arg in
 			*"-s"*)
-				CMD="${array[next]}"
+				local CMD="${array[next]}"
 				;;
 			*"-p"*)
-				PROCESSES="${array[next]//,/ }"
+				local PROCESSES="${array[next]//,/ }"
 				;;
 			*"-n"*)
-				THREADS="${array[next]//,/ }"
+				local THREADS="${array[next]//,/ }"
 				;;
 			*"-t"*)
-				TITLE_TEXT="${array[next]}"
+				local TITLE_TEXT="${array[next]}";;
+			*"-g"*)
+				local TYPE="${array[next]}";;
+			*"-N"*)
+				local NODES="${array[next]}";;
 		esac
 	done
 
@@ -246,9 +252,11 @@ multiprofiler()
 			#echo -e  "#IMAGE\t#N_IMAGES\t#SOBEL_TIME\t#LOAD_TIME\t#EXPORT_TIME\t#IMAGE_FILE" >> $RESULTS_FILE
 			#fi
 
+
 			if [ -f "$RESULTS_FILE" ];
 			then
-				local CMD_ARG="${i} ${j}"
+				local CMD_ARG="-n ${i} -o ${j} -t ${TYPE} -N ${NODES}"
+				echo "ARGS: ${CMD_ARG}"
 				$CMD_BASENAME $CMD_ARG | grep "OUTPUT" | awk '{printf("%s\t%s\t%s\t%s\t%s\t", $3, $12, $7, $17, $21); system("echo "$10"| cut --delimiter='/' -f 3")}' >> $RESULTS_FILE
 
 				# Sort file on filter time
